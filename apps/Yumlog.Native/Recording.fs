@@ -57,7 +57,7 @@ module NativeRecording =
         | "libaom-av1" | "libsvtav1" | "av1_nvenc" | "av1_qsv" | "av1" -> "av1"
         | other -> other
 
-    let private resolveFfmpeg config =
+    let internal resolveFfmpeg config =
         candidatePaths config
         |> List.tryFind (fun candidate -> candidate <> "ffmpeg" && File.Exists(candidate))
         |> Option.defaultWith (fun () ->
@@ -191,7 +191,10 @@ module NativeRecording =
 
         let metadataPath =
             if String.IsNullOrWhiteSpace(config.TimedMetadataOut) then
-                Path.ChangeExtension(outFile, ".mdkg") |> orEmptyIfNull
+                let path: string | null = Path.ChangeExtension(outFile, ".mdkg")
+                match path with
+                | null -> invalidArg "out-file" "An output path is required."
+                | path -> path
             else
                 Path.GetFullPath(config.TimedMetadataOut)
 

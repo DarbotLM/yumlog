@@ -16,13 +16,13 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Set up .NET 10 native runtime and SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
       - name: Set up .NET 11
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 11.0.x
       - name: Build Paperboy desktop app
@@ -50,15 +50,19 @@ jobs:
         run: .\launchers\Test-YumlogAPIMRoundTrip.ps1
       - name: Widget authoring contracts
         run: dotnet run --project .\apps\Yumlog.WidgetStudio\Yumlog.WidgetStudio.csproj -c Release -- self-test
+      - name: Build native desktop and CLI with nullness errors enabled
+        run: dotnet build .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release
       - name: Native extension and MDKG contracts
         run: |
-          .\apps\Yumlog.Native\Test-YumlogNativeExtensibility.ps1
-          .\launchers\Test-YumlogNativeMdkgRoundTrip.ps1
-          .\launchers\Test-YumlogNativeHandoff.ps1
+          .\apps\Yumlog.Native\Test-YumlogNativeExtensibility.ps1 -Configuration Release
+          .\launchers\Test-YumlogNativeMdkgRoundTrip.ps1 -Configuration Release
+          .\launchers\Test-YumlogNativeHandoff.ps1 -Configuration Release
       - name: Build and smoke-test production package
         run: |
           .\launchers\Build-YumlogProduction.ps1 -DotnetPath dotnet
           .\launchers\Test-YumlogProductionPackage.ps1
+      - name: Native CLI self-test
+        run: dotnet run --no-build --project .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release -- selftest
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Check Yumlog NPU emulator

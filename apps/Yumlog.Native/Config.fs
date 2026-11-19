@@ -73,9 +73,6 @@ module NativeConfig =
 
     let load path =
         if File.Exists(path) then
-            // Layered over defaults: a config file that omits the native encoder
-            // fields or extension section must not null them out. See
-            // NativeJson.readOver.
             NativeJson.readOver defaults path |> normalize
         else
             defaults

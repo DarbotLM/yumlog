@@ -2,7 +2,7 @@
 
 ## Screen Capture & Recording
 
-darbot.yumlog provides local Windows tools for desktop screen capture, recording, and analysis. The PowerShell tools remain available, `Yumlog.Native` is the packaged desktop host, and `Yumlog.Native.Cli` is the no-PowerShell automation path for capture, HEVC recording, analysis manifests, follow-me extraction, verified handoffs, runbooks, and on-device reasoning.
+darbot.yumlog provides local Windows tools for desktop screen capture, recording, and lightweight screen analysis. The legacy PowerShell tools remain available, and the native `Yumlog.Native.Cli` F# CLI is the no-PowerShell path for capture, recording orchestration, analysis manifests, follow-me step extraction, verifiable runbooks, and on-device reasoning about a recording.
 
 Two reference documents cover the native path in depth:
 
@@ -85,10 +85,10 @@ read local recordings/configuration.
 ```powershell
 # Analyze existing images, copy sources, and emit a portable verified handoff.
 # No desktop capture or OCR model provisioning with --ocr none.
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- handoff --input .\screenshots --out-dir .\yumlogs\handoff-one --ocr none
+dotnet run --project .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release -- handoff --input .\screenshots --out-dir .\yumlogs\handoff-one --ocr none
 
 # Reuse only if the original inputs/options and every completed output match.
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- handoff --input .\screenshots --out-dir .\yumlogs\handoff-one --ocr none --resume
+dotnet run --project .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release -- handoff --input .\screenshots --out-dir .\yumlogs\handoff-one --ocr none --resume
 ```
 
 The versioned `handoff.json` identifies copied frames, `analysis.json`, and
@@ -106,6 +106,39 @@ contract and explicit OCR side effects.
 `handoff` OCR never provisions models. Use `readiness --ocr windows-ai` for a
 read-only `{ready,code,message}` probe; existing `analyze`/`follow` behavior is
 unchanged and may provision when explicitly invoked with OCR.
+
+#### Using Yumlog Studio
+
+Launch the native desktop UI on Windows with the .NET 10 SDK and Microsoft Edge
+WebView2 Runtime.
+
+```powershell
+dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release
+```
+
+Open a local video or record the desktop to create an AgentCard. Use the bottom
+tabs to work with clips, frames, audio, captions, agents, and analysis. Flip to
+**Paperboy** to copy the JSON Schema or export the card. **Harvest** can bundle
+the card, original recording, and derived files as a `.paperboy.zip`.
+
+FFmpeg and FFprobe enable video inspection and exports. Configure an optional
+`whisper-cli` executable and model under **Settings** for local speech
+transcription. **Voices** uses the installed Windows speech voices.
+
+#### Build and install the production package
+
+The release flow publishes self-contained `win-x64` Native, Paperboy, MCP, APIM,
+and Widget Studio payloads, bundles the local FFmpeg runtime, and writes per
+component payload digests.
+
+```powershell
+.\launchers\Build-YumlogProduction.ps1
+.\launchers\Test-YumlogProductionPackage.ps1
+.\launchers\Install-YumlogProduction.ps1
+```
+
+The installer creates versioned user-local binaries and Start Menu shortcuts.
+It does not modify system-wide certificate or service state.
 
 #### Using the native F# CLI
 
@@ -153,73 +186,11 @@ $exe = ".\apps\Yumlog.Native.Cli\bin\Release\net10.0-windows10.0.26100.0\win-x64
   -OutputRoot .\dist\Yumlog.Native -Configuration Release -NoSign
 ```
 
-The MSIX launcher requires Windows SDK `makeappx.exe` and rebuilds the package
-layout under the specified output root. **Omitting `-NoSign` creates/reuses a
-signing certificate and modifies CurrentUser certificate trust.** Installation
-is a separate explicit action. The older project `PackageMsix` target references
-two missing Paperboy image assets; use the documented native launcher instead.
-See the [packaging details](apps/Yumlog.Native/EXTENSIBILITY.md#package-identity-and-ocr)
-before running install or OCR helpers.
-
-#### Using the local APIM service
-
-```powershell
-# Build the APIM service
-dotnet build .\apps\Yumlog.APIM.Service\Yumlog.APIM.Service.fsproj -c Release
-
-# Run a temporary local round-trip validation on http://127.0.0.1:5119
-.\launchers\Test-YumlogAPIMRoundTrip.ps1
-
-# Install/start/stop as a Windows Service from an elevated PowerShell session
-.\launchers\Install-YumlogAPIMService.ps1
-.\launchers\Start-YumlogAPIMService.ps1
-.\launchers\Stop-YumlogAPIMService.ps1
-.\launchers\Uninstall-YumlogAPIMService.ps1
-```
-
-APIM service endpoints include `/health`, `/ready`, `/version`,
-`/capabilities`, `/acp/resources`, `/acp/resources/read`, `/acp/tools`,
-`/acp/tools/call`, `/acp/prompts`, `/acp/prompts/get`, `/apim/routes`, and
-`/apim/routes/invoke`. If `YUMLOG_APIM_API_KEY` or `Auth:ApiKey` is set,
-protected requests must provide the key in `X-Yumlog-APIM-Key`,
-`Authorization: Bearer <key>`, or `auth.token` in the JSON envelope. The service
-is a foundation: catalog/validation and envelope responses do not imply that
-OCR, bundling, model inference, or arbitrary route backends are executed.
-See the service guide for public endpoints and implementation limits.
-
-`Yumlog.Native` is local-only and uses `config\yumlog.native.json` by default. Capture uses .NET desktop APIs directly. Recording uses FFmpeg as a native child process. OCR uses the Windows AI Text Recognition stack: `--ocr auto`, `--ocr windows-ai`, and `--ocr raw-com` (alias of `windows-ai`) run the full recognition pipeline and return lines, words, polygon bounds, and confidence values. The pipeline is implemented in F# (`WindowsAiOcr.fs`) on the managed `Microsoft.WindowsAppSDK.AI` projections: it bootstraps the Windows App Runtime, checks `TextRecognizer.GetReadyState`, provisions the on-device model via `TextRecognizer.EnsureReadyAsync` when `NotReady`, creates a recognizer with `CreateAsync`, decodes the image to a BGRA8 `SoftwareBitmap`/`ImageBuffer`, and projects `RecognizeTextFromImage` results into the native data model. Windows AI OCR requires Windows App SDK runtime registration, package/sparse-package identity with `systemAIModels` (run the packaged build so `EnsureReadyAsync` can deploy the `Windows.Workload.ContentExtraction` model), and Copilot+/NPU-class hardware; the unpackaged exe reports `CapabilityMissing` by design. `apps\Yumlog.Native\Package.appxmanifest` declares the `systemAIModels` capability and an `appExecutionAlias` so the packaged CLI is invocable as `Yumlog.Native.exe`.
-
-`Mdkg.fs` implements the `.mdkg` binary container format (Magic: `MDKG\r\n\x1A\n`, version 1.0). MDKG carries timestamped metadata alongside recordings as a standalone sidecar. The typed layer contracts cover timing, OCR, change scores, navigation, embeddings, semantic and integration metadata, and the extension catalog. The binary format and its proposed MP4 integration are documented in [MDKG-SPEC.md](apps/Yumlog.Native/hevc-swarm-out/MDKG-SPEC.md); writing a sidecar does not itself mux metadata into an MP4.
-
-#### Native extension catalog
-
-```powershell
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- extensions list
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- extensions validate --dir .\apps\Yumlog.Native\Samples
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- extensions mcp
-```
-
-The catalog combines built-in capability descriptors with optional JSON extension
-manifests. The MCP command exports a manifest; it does not start a tool server or
-execute the declared extensions. See the [extension guide](apps/Yumlog.Native/EXTENSIBILITY.md).
-
-#### Widget Studio
-
-```powershell
-dotnet run --project .\apps\Yumlog.WidgetStudio\Yumlog.WidgetStudio.csproj -c Release -- validate .\apps\Yumlog.WidgetStudio\Samples\paperboy-capability-mesh.widget.json
-dotnet run --project .\apps\Yumlog.WidgetStudio\Yumlog.WidgetStudio.csproj -c Release -- preview .\apps\Yumlog.WidgetStudio\Samples\paperboy-livetile.widget.json .\dist\widgetstudio\paperboy.preview.html
-dotnet run --project .\apps\Yumlog.WidgetStudio\Yumlog.WidgetStudio.csproj -c Release -- self-test
-```
-
-Widget Studio supports schema versions `1.0` and `1.1`, semantic validation,
-capability indexes, static HTML previews, and `.widget.zip` exports. It is an
-authoring CLI, not an always-running widget host.
-
 > `--timed-metadata-out` is what makes a recording answerable. Without it you get
 > video only, and `runbook` and `reason` have nothing to read.
 
-> Unknown CLI options are rejected with exit code 1. Correct typos before retrying
-> automation.
+> Unknown arguments are currently ignored silently. A typo such as `--output`
+> instead of `--out-file` exits 0 and writes nothing.
 
 #### Verifiable runbooks
 
@@ -255,10 +226,10 @@ hardware probes, and returns JSON with keys `passed`, `passedCount`,
 `failedCount`, and `cases`. `mdkg.timing.coverageNoOverlap` ships with a negative
 control so it cannot pass vacuously.
 
-Build output is excluded from source control. Build the CLI before trusting
-`selftest`, package, or UI validation results.
+Note that `bin\` is committed in this repository, so a stale binary can report an
+old pass count. Rebuild before treating `selftest` output as current.
 
-`Yumlog.Native.Cli` is local-first and uses `config\yumlog.native.json` by default. Capture uses Windows Graphics Capture with a Direct3D path; recording encodes HEVC through NVENC or x265, with the explicit FFmpeg backend retained for compatibility (`--backend auto|nvenc|x265|ffmpeg`). `selftest` reports NVENC availability via `probe.nvenc.driverDll`. OCR uses the Windows AI Text Recognition stack: `--ocr auto`, `--ocr windows-ai`, and `--ocr raw-com` (alias of `windows-ai`) run the full recognition pipeline and return lines, words, polygon bounds, and confidence values. The pipeline is implemented in F# (`WindowsAiOcr.fs`) on the managed `Microsoft.WindowsAppSDK.AI` projections. Windows AI OCR requires Windows App SDK runtime registration, package/sparse-package identity with `systemAIModels`, compatible NPU hardware, and an available model; the unpackaged executable reports `CapabilityMissing` by design. `apps\Yumlog.Native\Package.appxmanifest` declares the capability and aliases the packaged app.
+`Yumlog.Native` is local-only and uses `config\yumlog.native.json` by default. Capture uses Windows Graphics Capture (WGC) with a Direct3D path; recording encodes HEVC through NVENC, falls back to x265, then to FFmpeg (`--backend auto|nvenc|x265|ffmpeg`). `selftest` reports NVENC availability via `probe.nvenc.driverDll`. OCR uses the Windows AI Text Recognition stack: `--ocr auto`, `--ocr windows-ai`, and `--ocr raw-com` (alias of `windows-ai`) run the full recognition pipeline and return lines, words, polygon bounds, and confidence values. The pipeline is implemented in F# (`WindowsAiOcr.fs`) on the managed `Microsoft.WindowsAppSDK.AI` projections: it bootstraps the Windows App Runtime, checks `TextRecognizer.GetReadyState`, provisions the on-device model via `TextRecognizer.EnsureReadyAsync` when `NotReady`, creates a recognizer with `CreateAsync`, decodes the image to a BGRA8 `SoftwareBitmap`/`ImageBuffer`, and projects `RecognizeTextFromImage` results into the native data model. Windows AI OCR requires Windows App SDK runtime registration, package/sparse-package identity with `systemAIModels` (run the packaged build so `EnsureReadyAsync` can deploy the `Windows.Workload.ContentExtraction` model), and Copilot+/NPU-class hardware; the unpackaged exe reports `CapabilityMissing` by design. `apps\Yumlog.Native\Package.appxmanifest` declares the `systemAIModels` capability and an `appExecutionAlias` so the packaged CLI is invocable as `Yumlog.Native.Cli.exe`.
 
 `Mdkg.fs` implements the `.mdkg` binary container format (Magic: `MDKG\r\n\x1A\n`, version 1.0). MDKG is a layered metadata track format designed to carry frame-accurate metadata alongside HEVC/MP4 recordings. Layer samples align to the `MovieTimescale` (10,000,000 ticks/sec), and unregistered layer IDs are skipped rather than treated as corruption, so the format is forward-compatible.
 
@@ -288,30 +259,66 @@ cargo check
 ```
 
 The first implementation exposes Tauri commands for `TextRecognizer`-style state, provisioning, model inventory, trace journal, container runtime probing, and recognition request acceptance. The next integration step is a local HTTP or named-pipe bridge so `Yumlog.Native.Cli` can call the emulator through a first-class `--ocr npu-emulator` mode.
+The MSIX launcher requires Windows SDK `makeappx.exe` and rebuilds the package
+layout under the specified output root. **Omitting `-NoSign` creates/reuses a
+signing certificate and modifies CurrentUser certificate trust.** Installation
+is a separate explicit action. The older project `PackageMsix` target references
+two missing Paperboy image assets; use the documented native launcher instead.
+See the [packaging details](apps/Yumlog.Native/EXTENSIBILITY.md#package-identity-and-ocr)
+before running install or OCR helpers.
 
-#### Native Agent Card desktop
-
-The packaged `Yumlog.Native.exe` shell is a dark local-first workspace with a
-persistent mode side pane and bottom tabs for:
-
-`Video`, `Screenshot`, `Audio`, `Transcript`, `Agents`, `Voices`, `Insights`,
-`Harvest`, and `Settings`.
-
-Every mode is backed by an Agent Card entry in
-`apps\Yumlog.Native\Assets\yumlog_agent_cards.json`. Video items use the full
-Paperboy adaptive flip-card contract with 4:3 shells at `220x165`, `360x270`,
-`720x540`, and `1080x810`. A `.agent-card.json` is emitted beside harvested
-videos with SHA-256 hashes, MDKG provenance, and front/back shell metadata.
+#### Using the local APIM service
 
 ```powershell
-.\launchers\Build-YumlogProduction.ps1 -DotnetPath dotnet
-.\launchers\Install-YumlogProduction.ps1
+# Build the APIM service
+dotnet build .\apps\Yumlog.APIM.Service\Yumlog.APIM.Service.fsproj -c Release
+
+# Run a temporary local round-trip validation on http://127.0.0.1:5119
+.\launchers\Test-YumlogAPIMRoundTrip.ps1
+
+# Install/start/stop as a Windows Service from an elevated PowerShell session
+.\launchers\Install-YumlogAPIMService.ps1
+.\launchers\Start-YumlogAPIMService.ps1
+.\launchers\Stop-YumlogAPIMService.ps1
+.\launchers\Uninstall-YumlogAPIMService.ps1
 ```
 
-The installer writes a versioned user-local application tree, Start Menu
-shortcuts, and the Native CLI path. Generated evidence remains under
-`Documents\Yumlog Native`; generated A2SWE project packages remain under
-`Documents\Yumlog Projects`.
+APIM service endpoints include `/health`, `/ready`, `/version`,
+`/capabilities`, `/acp/resources`, `/acp/resources/read`, `/acp/tools`,
+`/acp/tools/call`, `/acp/prompts`, `/acp/prompts/get`, `/apim/routes`, and
+`/apim/routes/invoke`. If `YUMLOG_APIM_API_KEY` or `Auth:ApiKey` is set,
+protected requests must provide the key in `X-Yumlog-APIM-Key`,
+`Authorization: Bearer <key>`, or `auth.token` in the JSON envelope. The service
+is a foundation: catalog/validation and envelope responses do not imply that
+OCR, bundling, model inference, or arbitrary route backends are executed.
+See the service guide for public endpoints and implementation limits.
+
+
+`Mdkg.fs` implements the `.mdkg` binary container format (Magic: `MDKG\r\n\x1A\n`, version 1.0). MDKG carries timestamped metadata alongside recordings as a standalone sidecar. The typed layer contracts cover timing, OCR, change scores, navigation, embeddings, semantic and integration metadata, and the extension catalog. The binary format and its proposed MP4 integration are documented in [MDKG-SPEC.md](apps/Yumlog.Native/hevc-swarm-out/MDKG-SPEC.md); writing a sidecar does not itself mux metadata into an MP4.
+
+#### Native extension catalog
+
+```powershell
+dotnet run --project .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release -- extensions list
+dotnet run --project .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release -- extensions validate --dir .\apps\Yumlog.Native\Samples
+dotnet run --project .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release -- extensions mcp
+```
+
+The catalog combines built-in capability descriptors with optional JSON extension
+manifests. The MCP command exports a manifest; it does not start a tool server or
+execute the declared extensions. See the [extension guide](apps/Yumlog.Native/EXTENSIBILITY.md).
+
+#### Widget Studio
+
+```powershell
+dotnet run --project .\apps\Yumlog.WidgetStudio\Yumlog.WidgetStudio.csproj -c Release -- validate .\apps\Yumlog.WidgetStudio\Samples\paperboy-capability-mesh.widget.json
+dotnet run --project .\apps\Yumlog.WidgetStudio\Yumlog.WidgetStudio.csproj -c Release -- preview .\apps\Yumlog.WidgetStudio\Samples\paperboy-livetile.widget.json .\dist\widgetstudio\paperboy.preview.html
+dotnet run --project .\apps\Yumlog.WidgetStudio\Yumlog.WidgetStudio.csproj -c Release -- self-test
+```
+
+Widget Studio supports schema versions `1.0` and `1.1`, semantic validation,
+capability indexes, static HTML previews, and `.widget.zip` exports. It is an
+authoring CLI, not an always-running widget host.
 
 #### Using the Unified CLI
 
@@ -553,7 +560,11 @@ darbot.yumlog/
 │   ├── Record-Terminals.ps1
 │   └── yumlog.ps1
 ├── apps/
-│   ├── Yumlog.Native/            # Packaged native desktop host and shared implementation
+│   ├── Paperboy.Desktop/
+│   ├── Paperboy.Mcp/
+│   ├── Yumlog.APIM.Service/
+│   ├── Yumlog.WidgetStudio/
+│   ├── Yumlog.Native/            # F# implementation library
 │   │   ├── WgcCapture.fs         # Windows Graphics Capture
 │   │   ├── NvencHevc.fs          # NVENC HEVC encoder
 │   │   ├── X265Encoder.fs        # x265 software fallback
@@ -564,16 +575,14 @@ darbot.yumlog/
 │   │   ├── SelfTest.fs           # built-in correctness suite
 │   │   └── hevc-swarm-out/       # MDKG-SPEC.md, challenge reviews (see its README)
 ├── hevc-swarm-out/               # CDP harnesses + recording artifacts (see its README)
-│   ├── Yumlog.Native.Cli/        # Runnable CLI entry point
+│   ├── Yumlog.Native.Cli/        # runnable CLI entry point
 │   ├── Yumlog.NpuEmulator/       # Rust/Tauri NPU-emulation runtime
 │   ├── Paperboy.Desktop/
-│   ├── Paperboy.Mcp/
-│   ├── Yumlog.APIM.Service/
-│   └── Yumlog.WidgetStudio/
+│   └── Paperboy.Mcp/
 ├── docs/
 │   ├── NATIVE-CLI.md
 │   ├── ON-DEVICE-REASONING.md
-│   │   └── NPU-EMULATOR-CONTAINER-SPEC.md
+│   └── NPU-EMULATOR-CONTAINER-SPEC.md
 ├── bisect-test/
 ├── config/
 │   ├── tools.json

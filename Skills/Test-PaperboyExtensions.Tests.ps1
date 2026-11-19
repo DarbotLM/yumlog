@@ -309,10 +309,12 @@ Describe "Yumlog adaptive Agent Cards" {
     }
 
     It "Keeps installed MCP and media resolution package-relative" {
-        $nativeUi = Get-Content -LiteralPath (Join-Path $script:repoRoot 'apps\Yumlog.Native\NativeUi.fs') -Raw
+        $recording = Get-Content -LiteralPath (Join-Path $script:repoRoot 'apps\Yumlog.Native\Recording.fs') -Raw
+        $library = Get-Content -LiteralPath (Join-Path $script:repoRoot 'apps\Yumlog.Native\DesktopLibrary.fs') -Raw
         $paperboyUi = Get-Content -LiteralPath (Join-Path $script:appRoot 'MainWindow.xaml.cs') -Raw
-        $nativeUi | Should -Match 'componentLocal = Path\.Combine\(AppContext\.BaseDirectory, "\.tools"'
-        $nativeUi | Should -Match 'Path\.GetRelativePath\(root, path\)'
+        $recording | Should -Match 'AppContext\.BaseDirectory, "\.tools", "ffmpeg"'
+        $library | Should -Match 'let private descriptor \(item: Artifact\)'
+        $library | Should -Not -Match 'artifacts = artifacts video \|> Array\.map \(fun item -> item\.Path\)'
         $paperboyUi | Should -Match 'ResolveSiblingPath\("Paperboy\.Mcp", "Paperboy\.Mcp\.exe"\)'
         $paperboyUi | Should -Not -Match 'Copied MCP stdio launch command.*dotnet run --project'
     }

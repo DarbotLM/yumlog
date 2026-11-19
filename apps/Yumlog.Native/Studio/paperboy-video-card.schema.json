@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://darbotlabs.github.io/yumlog/paperboy-video-card.schema.json",
+  "title": "Yumlog Paperboy Video AgentCard",
+  "description": "Paperboy AgentCard for one local video and its derived artifacts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "id", "title", "role", "description", "inputs", "outputs", "actions", "liveTileState", "asset", "artifacts", "flipcard"],
+  "properties": {
+    "schema": { "const": "https://darbotlabs.github.io/yumlog/paperboy-video-card.schema.json" },
+    "version": { "const": "1.0" },
+    "id": { "type": "string", "pattern": "^paperboy\\.video\\.[a-f0-9]{64}$" },
+    "title": { "type": "string", "minLength": 1 },
+    "role": { "const": "video-workspace" },
+    "description": { "type": "string", "minLength": 1 },
+    "inputs": { "$ref": "#/$defs/names" },
+    "outputs": { "$ref": "#/$defs/names" },
+    "actions": { "$ref": "#/$defs/names" },
+    "liveTileState": { "enum": ["ready", "missing"] },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "addedAt", "media"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "addedAt": { "type": "string", "format": "date-time" },
+        "media": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["duration", "width", "height", "videoCodec", "audioCodec", "subtitleStreams", "bytes"],
+              "properties": {
+                "duration": { "type": "number", "minimum": 0 },
+                "width": { "$ref": "#/$defs/nonnegativeInteger" },
+                "height": { "$ref": "#/$defs/nonnegativeInteger" },
+                "videoCodec": { "type": "string" },
+                "audioCodec": { "type": "string" },
+                "subtitleStreams": { "$ref": "#/$defs/nonnegativeInteger" },
+                "bytes": { "$ref": "#/$defs/nonnegativeInteger" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "name", "start", "duration", "exists"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "kind": { "enum": ["clip", "screenshot", "frame", "audio", "spectrogram", "transcript", "voice", "ocr", "runbook", "timedMetadata"] },
+          "name": { "type": "string", "minLength": 1 },
+          "start": { "$ref": "#/$defs/seconds" },
+          "duration": { "$ref": "#/$defs/seconds" },
+          "exists": { "type": "boolean" }
+        }
+      }
+    },
+    "flipcard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["size", "sizes", "front", "back", "tabs"],
+      "properties": {
+        "size": { "enum": ["compact", "studio", "wide"] },
+        "sizes": { "const": ["compact", "studio", "wide"] },
+        "front": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "defaultTab"],
+          "properties": {
+            "title": { "type": "string", "minLength": 1 },
+            "defaultTab": { "const": "video" }
+          }
+        },
+        "back": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "schema"],
+          "properties": {
+            "title": { "const": "Paperboy" },
+            "schema": { "const": "https://darbotlabs.github.io/yumlog/paperboy-video-card.schema.json" }
+          }
+        },
+        "tabs": {
+          "type": "array",
+          "minItems": 9,
+          "items": false,
+          "prefixItems": [
+            { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "video" }, "label": { "const": "Video" } } }] },
+            { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "screenshot" }, "label": { "const": "Screenshot" } } }] },
+            { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "audio" }, "label": { "const": "Audio" } } }] },
+            { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "transcript" }, "label": { "const": "Transcript" } } }] },
+            { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "agents" }, "label": { "const": "Agents" } } }] },
+            { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "voices" }, "label": { "const": "Voices" } } }] },
+            { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "insights" }, "label": { "const": "Insights" } } }] },
+            { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "harvest" }, "label": { "const": "Harvest" } } }] },
+            { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "settings" }, "label": { "const": "Settings" } } }] }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "seconds": { "type": ["number", "null"], "minimum": 0 },
+    "nonnegativeInteger": { "type": "integer", "minimum": 0 },
+    "names": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "tab": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "role", "inputs", "outputs", "actions"],
+      "properties": {
+        "key": { "type": "string" },
+        "label": { "type": "string" },
+        "role": { "type": "string", "minLength": 1 },
+        "inputs": { "$ref": "#/$defs/names" },
+        "outputs": { "$ref": "#/$defs/names" },
+        "actions": { "$ref": "#/$defs/names" }
+      }
+    }
+  }
+}

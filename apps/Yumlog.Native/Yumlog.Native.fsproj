@@ -38,6 +38,9 @@
     <!-- CPU execution provider for the on-device model (OnDeviceLlm.fs), which is in
          the shared compile list and so must resolve for both projects. -->
     <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI" Version="0.15.1" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <PackageReference Include="System.Speech" Version="10.0.0" />
+    <ProjectReference Include="..\Paperboy.Bundles\Paperboy.Bundles.csproj" />
     <ProjectReference Include="..\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
@@ -50,16 +53,24 @@
     </Content>
   </ItemGroup>
 
-  <!-- Single shared source list - see Yumlog.Native.Core.props. NativeUi.fs is
-       WinExe-only and sits between the two shared halves. -->
+  <!-- Desktop dependencies stay out of the shared CLI compile lists. -->
   <Import Project="Yumlog.Native.Core.props" />
-
   <Import Project="Yumlog.Native.Tail.props" />
 
   <ItemGroup>
+    <Compile Include="DesktopMedia.fs" />
+    <Compile Include="DesktopLibrary.fs" />
     <Compile Include="NativeUi.fs" />
     <Compile Include="Program.fs" />
+    <Content Include="Studio\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!-- The WebView2 package adds its WPF adapter even for WinForms hosts. -->
+  <Target Name="RemoveUnusedWebView2WpfReference" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+    </ItemGroup>
+  </Target>
 
   <Target Name="PackageMsix" DependsOnTargets="Build">
     <Error Condition="!Exists('$(YumlogMakeAppx)')" Text="makeappx.exe was not found at '$(YumlogMakeAppx)'. Set /p:YumlogMakeAppx=&lt;path&gt; to override." />

@@ -285,13 +285,13 @@ module Mdkg =
     let serializeJson<'T> (value: 'T) =
         JsonSerializer.SerializeToUtf8Bytes(value, jsonOptions)
 
-    let deserializeJson<'T when 'T: not struct> (payload: byte array) : 'T =
-        if Object.ReferenceEquals(payload, null) then
+    let deserializeJson<'T> (payload: byte array) : 'T =
+        if isNullRef payload then
             invalidArg (nameof payload) "JSON payload must not be null."
 
-        match JsonSerializer.Deserialize<'T>(payload, jsonOptions) with
+        match JsonSerializer.Deserialize(ReadOnlySpan<byte>(payload), typeof<'T>, jsonOptions) with
         | null -> invalidData "JSON payload deserialized to null."
-        | value -> value
+        | value -> value :?> 'T
 
     module Validation =
 

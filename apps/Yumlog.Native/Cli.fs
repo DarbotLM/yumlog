@@ -35,6 +35,11 @@ Usage:
                           [--max-tokens n] [--json-out path]
   Yumlog.Native.Cli models
 
+  Yumlog.Native.Cli handoff --input path --out-dir path [--ocr none|auto|windows-ai|raw-com] [--resume]
+  Yumlog.Native.Cli readiness --ocr none|auto|windows-ai|raw-com
+  Yumlog.Native.Cli extensions list [--config path] [--dir path] [--kind kind] [--name text] [--no-builtin] [--no-external]
+  Yumlog.Native.Cli extensions mcp [--config path] [--dir path] [--no-builtin] [--no-external]
+  Yumlog.Native.Cli extensions validate [--config path] [--dir path] [--pattern glob]
 Extension kinds:
   model, agent, tool, skill, workflow, connector, plugin, extension, mcp-server, api, continuous-ai
 """

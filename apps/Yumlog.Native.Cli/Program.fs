@@ -44,14 +44,14 @@ module Program =
             let manifestPath = Path.Combine(config.OutDir, "follow-manifest.json")
             writeJsonFile manifestPath manifest
             0
+        | Orchestrate(planPath, _) ->
+            NativeOrchestration.runPlan planPath |> writeJson
+            0
         | Handoff config ->
             NativeHandoff.run config |> writeJson
             0
         | Readiness mode ->
             NativeOcr.readiness mode |> writeJson
-            0
-        | Orchestrate(planPath, _) ->
-            NativeOrchestration.runPlan planPath |> writeJson
             0
         | ExtensionsShow(config, query, _) ->
             NativeExtensibility.catalog config
@@ -185,6 +185,8 @@ module Program =
         | Reason _
         | Watch _
         | ListModels
+        | Handoff _
+        | Readiness _
         | Help -> false
         | _ -> true
 

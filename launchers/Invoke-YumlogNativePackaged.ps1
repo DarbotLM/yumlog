@@ -12,16 +12,16 @@ if ($InstallLatest) {
     & (Join-Path $launcherRoot "Install-YumlogNativeMsix.ps1") -BuildIfMissing -Reinstall:$Reinstall | Out-Host
 }
 
-$aliasPath = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\Yumlog.Native.exe"
+$aliasPath = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\Yumlog.Native.Cli.exe"
 if (-not (Test-Path -LiteralPath $aliasPath)) {
-    $command = Get-Command "Yumlog.Native.exe" -ErrorAction SilentlyContinue
+    $command = Get-Command "Yumlog.Native.Cli.exe" -ErrorAction SilentlyContinue
     if ($command) {
         $aliasPath = $command.Source
     }
 }
 
 if (-not (Test-Path -LiteralPath $aliasPath)) {
-    throw "Yumlog.Native.exe app execution alias was not found. Install the MSIX package and ensure app execution aliases are enabled."
+    throw "Yumlog.Native.Cli.exe app execution alias was not found. Install the MSIX package and ensure app execution aliases are enabled."
 }
 
 & $aliasPath @YumlogArgs

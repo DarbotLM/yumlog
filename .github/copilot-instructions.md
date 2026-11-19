@@ -2,13 +2,11 @@
 
 ## Project Overview
 
-Darbot Yumlog is a Windows local-first capture and automation toolkit. It combines
-the lightweight PowerShell/FFmpeg path with a split native stack: a packaged WPF
-desktop host (`apps/Yumlog.Native`) and a console automation host
-(`apps/Yumlog.Native.Cli`). The native stack supports hardware HEVC recording,
-typed MDKG metadata, verifiable runbooks, offline reasoning, handoffs, readiness
-probes, and extension catalogs. Paperboy, APIM/ACP, and Widget Studio provide
-delivery, integration, and widget-authoring surfaces.
+Darbot Yumlog is a local-first Windows toolkit with PowerShell/FFmpeg utilities,
+native F# capture and HEVC recording, a WebView2 Agent Card Studio with Video,
+Screenshot, Audio, Transcript, Agents, Voices, Insights, Harvest, and Settings,
+typed MDKG metadata, verifiable runbooks, on-device reasoning, Paperboy WPF and
+MCP apps, a local APIM/ACP service foundation, and Widget Studio authoring.
 
 ## Core Principles
 
@@ -56,11 +54,12 @@ delivery, integration, and widget-authoring surfaces.
 
 ## Working on the native stack
 
-- Build `apps/Yumlog.Native.Cli` for automation and `apps/Yumlog.Native` for the packaged desktop host.
-- `bin/`, `obj/`, downloaded tools, and generated media are not source. **Rebuild before trusting `selftest`**.
+- Build `apps/Yumlog.Native.Cli` for automation and `apps/Yumlog.Native` for the packaged Studio host.
+- Keep the nine Studio modes and their Paperboy flip-card/side-pane contracts aligned with `DesktopLibrary.tabs`.
+- `bin/` and `obj/` are committed despite appearing in `.gitignore`. **Rebuild before trusting `selftest`**; a stale binary once reported 15 checks while the source defined 16.
 - `selftest` JSON keys are `passed`, `passedCount`, `failedCount`, `cases`.
 - CLI JSON output has trailing non-JSON text; slice between the first `{` and last `}`.
-- Reject unknown or incomplete CLI arguments; never report success for a misspelled flag.
+- Unknown CLI arguments are ignored silently, so a flag typo exits 0 and does nothing.
 - To make a fact visible to `reason`, put it in the grounding string in `OnDeviceLlm.fs`. Runbook proofs are **not** sent to the model.
 
 ### Testing the screen-observation features
