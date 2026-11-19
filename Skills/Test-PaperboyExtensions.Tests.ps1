@@ -182,6 +182,7 @@ Describe "Paperboy MCP capability surface" {
         # Existing tool contract must stay intact.
         $toolNames | Should -Contain 'paperboy.bundle.pack'
         $toolNames | Should -Contain 'paperboy.cards.list'
+        $toolNames | Should -Contain 'paperboy.cards.videoSchema'
 
         $extensionMetadata = $responses[0].result.capabilities.experimental.paperboy.extensions
         $extensionMetadata.schemaVersion | Should -Be '1.0'
@@ -201,6 +202,7 @@ Describe "Paperboy MCP capability surface" {
         $uris | Should -Contain 'paperboy://extensions'
         $uris | Should -Contain 'paperboy://extensions/schema'
         $uris | Should -Contain 'paperboy://cards'
+        $uris | Should -Contain 'paperboy://cards/video-schema'
 
         $responses[2].result.contents[0].mimeType | Should -Be 'application/schema+json'
         ($responses[2].result.contents[0].text | ConvertFrom-Json).'$id' | Should -Be 'https://darbotlabs.github.io/yumlog/paperboy-extension.schema.json'
@@ -251,5 +253,67 @@ Describe "Paperboy MCP capability surface" {
         $defaultIds | Should -Not -Contain 'paperboy.connector.yumlog-bridges'
         $mergedIds | Should -Contain 'paperboy.connector.yumlog-bridges'
         $mergedIds.Count | Should -BeGreaterThan $defaultIds.Count
+    }
+}
+
+Describe "Yumlog adaptive Agent Cards" {
+    It "Ships all nine bottom modes as Agent Cards" {
+        $cardsPath = Join-Path $script:repoRoot 'apps\Yumlog.Native\Assets\yumlog_agent_cards.json'
+        $cards = Get-Content -LiteralPath $cardsPath -Raw | ConvertFrom-Json
+
+        @($cards.title) | Should -Be @(
+            'Video',
+            'Screenshot',
+            'Audio',
+            'Transcript',
+            'Agents',
+            'Voices',
+            'Insights',
+            'Harvest',
+            'Settings'
+        )
+        @($cards.id) | Should -Be @(
+            'yumlog.video',
+            'yumlog.screenshot',
+            'yumlog.audio',
+            'yumlog.transcript',
+            'yumlog.agents',
+            'yumlog.voices',
+            'yumlog.insights',
+            'yumlog.harvest',
+            'yumlog.settings'
+        )
+    }
+
+    It "Defines the full adaptive Paperboy video card shell" {
+        $schemaPath = Join-Path $script:appRoot 'Assets\AgentCards\paperboy.video-agent-card.schema.json'
+        $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
+
+        $schema.required | Should -Contain 'shell'
+        $schema.required | Should -Contain 'adaptiveSizes'
+        $schema.required | Should -Contain 'media'
+        $schema.required | Should -Contain 'provenance'
+        @($schema.properties.adaptiveSizes.items.properties.name.enum) | Should -Be @('small', 'medium', 'large', 'presentation')
+        $schema.properties.shell.properties.aspectRatio.const | Should -Be '4:3'
+    }
+
+    It "Wires shipped extension contracts to real local surfaces" {
+        $manifestPath = Join-Path $script:extensionsRoot 'yumlog.local-bridges.extension.json'
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        $status = $manifest.capabilities | Where-Object id -eq 'yumlog.apim.status'
+        $ocr = $manifest.capabilities | Where-Object id -eq 'yumlog.native.ocr'
+
+        $status.url | Should -Be 'http://127.0.0.1:5118/health'
+        $ocr.command | Should -Be 'Yumlog.Native.Cli.exe'
+        @($ocr.args) | Should -Be @('analyze', '--input', '{{imagePath}}', '--ocr', 'auto')
+    }
+
+    It "Keeps installed MCP and media resolution package-relative" {
+        $nativeUi = Get-Content -LiteralPath (Join-Path $script:repoRoot 'apps\Yumlog.Native\NativeUi.fs') -Raw
+        $paperboyUi = Get-Content -LiteralPath (Join-Path $script:appRoot 'MainWindow.xaml.cs') -Raw
+        $nativeUi | Should -Match 'componentLocal = Path\.Combine\(AppContext\.BaseDirectory, "\.tools"'
+        $nativeUi | Should -Match 'Path\.GetRelativePath\(root, path\)'
+        $paperboyUi | Should -Match 'ResolveSiblingPath\("Paperboy\.Mcp", "Paperboy\.Mcp\.exe"\)'
+        $paperboyUi | Should -Not -Match 'Copied MCP stdio launch command.*dotnet run --project'
     }
 }

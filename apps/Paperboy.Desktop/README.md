@@ -2,7 +2,7 @@
 
 Paperboy Desktop is a Windows-native .NET 11 WPF app for creating and handling
 lightweight `.paperboy.zip` bundles. Desktop and the companion MCP host are
-version **0.4.2**.
+version **0.5.0**.
 
 ## Features
 

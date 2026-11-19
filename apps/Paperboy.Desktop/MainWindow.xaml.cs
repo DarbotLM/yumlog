@@ -7,7 +7,9 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Windows;
 using Clipboard = System.Windows.Clipboard;
 using DataFormats = System.Windows.DataFormats;
@@ -43,13 +45,17 @@ public partial class MainWindow : Window
 
     private static readonly string[] ApimRoutes =
     [
-        "GET /paperboy/status",
-        "GET /paperboy/routes",
-        "GET /paperboy/acp/resources",
-        "POST /paperboy/mcp/tools/call",
-        "GET /paperboy/foundry/health",
-        "GET /paperboy/ocr/readiness",
-        "POST /paperboy/validate"
+        "GET /health",
+        "GET /readiness",
+        "GET /version",
+        "GET /capabilities",
+        "GET /acp/resources",
+        "GET /acp/tools",
+        "POST /acp/resources/read",
+        "POST /acp/tools/call",
+        "POST /acp/prompts/get",
+        "GET /apim/routes",
+        "POST /apim/routes/invoke"
     ];
 
     private static readonly string[] AcpResources =
@@ -651,9 +657,12 @@ public partial class MainWindow : Window
     {
         var appDir = AppContext.BaseDirectory;
         var mcpExe = System.IO.Path.Combine(appDir, "Paperboy.Mcp.exe");
+        var publishedMcp = ResolveSiblingPath("Paperboy.Mcp", "Paperboy.Mcp.exe");
         var command = File.Exists(mcpExe)
             ? $"\"{mcpExe}\""
-            : "dotnet run --project .\\apps\\Paperboy.Mcp\\Paperboy.Mcp.csproj";
+            : File.Exists(publishedMcp)
+                ? $"\"{publishedMcp}\""
+                : $"\"{System.IO.Path.Combine(appDir, "Paperboy.exe")}\" --mcp";
         Clipboard.SetText(command);
         SetStatus("Copied MCP stdio launch command to clipboard.");
         AppendLog($"MCP stdio command: {command}");
@@ -711,8 +720,8 @@ public partial class MainWindow : Window
     {
         try
         {
-            var studioExe = ResolveSiblingPath("Yumlog.WidgetStudio", "bin", "Debug", "net11.0", "Yumlog.WidgetStudio.exe");
-            if (File.Exists(studioExe))
+            var studioExe = ResolveWidgetStudioExecutable();
+            if (!string.IsNullOrWhiteSpace(studioExe))
             {
                 Process.Start(new ProcessStartInfo(studioExe) { UseShellExecute = true });
                 SetStatus("Opened Widget Studio.");
@@ -748,11 +757,102 @@ public partial class MainWindow : Window
         AppendLog($"Foundry Local health check: {status}");
     }
 
-    private void CheckOcrReadiness_Click(object sender, RoutedEventArgs e)
+    private async void CheckOcrReadiness_Click(object sender, RoutedEventArgs e)
     {
-        var status = RefreshOcrReadiness();
+        var status = await ProbeOcrReadinessAsync();
         SetStatus($"OCR readiness check: {status}");
         AppendLog($"OCR readiness check: {status}");
+    }
+
+    private async void GenerateWidgetProject_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var name = ApimProjectNameText.Text.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                throw new InvalidOperationException("Enter a project name.");
+            }
+
+            var projectRoot = GetProjectOutputDirectory(name);
+            Directory.CreateDirectory(projectRoot);
+            var slug = ToProjectSlug(name);
+            var manifestPath = System.IO.Path.Combine(projectRoot, $"{slug}.widget.json");
+            var previewPath = System.IO.Path.Combine(projectRoot, "preview", "index.html");
+            var packagePath = System.IO.Path.Combine(projectRoot, $"{slug}.widget.zip");
+            var templatePath = ResolveSiblingPath(
+                "Yumlog.WidgetStudio",
+                "Samples",
+                "paperboy-capability-mesh.widget.json");
+
+            if (!File.Exists(templatePath))
+            {
+                throw new FileNotFoundException("Widget Studio project template was not found.", templatePath);
+            }
+
+            var root = JsonNode.Parse(await File.ReadAllTextAsync(templatePath))?.AsObject()
+                ?? throw new InvalidDataException("Widget Studio template was empty.");
+            var widget = root["widget"]?.AsObject()
+                ?? throw new InvalidDataException("Widget Studio template is missing widget metadata.");
+            var package = root["package"]?.AsObject()
+                ?? throw new InvalidDataException("Widget Studio template is missing package metadata.");
+
+            root["projectId"] = $"yumlog.a2swe.{slug}";
+            root["name"] = name;
+            root["version"] = "0.5.0";
+            root["owner"] = "a2swe";
+            widget["id"] = $"a2swe.{slug}";
+            widget["displayName"] = $"{name} A2SWE Project";
+            widget["description"] = $"Production-ready A2SWE project generated for {name} with APIM, ACP, OCR, capability, self-reflection, and continuous-agent contracts.";
+
+            var tags = widget["tags"]?.AsArray() ?? [];
+            tags.Add("microsoft-ignite");
+            tags.Add("a2swe");
+            tags.Add("production");
+            widget["tags"] = tags;
+            package["packageId"] = $"{slug}.widget";
+
+            var notes = root["handoffNotes"]?.AsArray() ?? [];
+            notes.Add($"Generated by Paperboy v0.5.0 for {name}.");
+            notes.Add("A2SWE quality gates require schema validation, preview review, package inspection, and self-reflection before promotion.");
+            root["handoffNotes"] = notes;
+
+            var extensions = root["extensions"]?.AsObject() ?? [];
+            extensions["x-darbot.a2swe"] = new JsonObject
+            {
+                ["project"] = name,
+                ["reviewMode"] = "introspective",
+                ["qualityGates"] = new JsonArray("schema", "preview", "package", "security", "capabilities"),
+                ["promotion"] = "requires-human-approval"
+            };
+            root["extensions"] = extensions;
+
+            await File.WriteAllTextAsync(
+                manifestPath,
+                root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+
+            ApimProjectStatusText.Text = $"Generating {name}...";
+            SetStatus($"Generating Widget Studio project: {name}");
+            AppendLog($"Widget project manifest: {manifestPath}");
+
+            await RunWidgetStudioAsync(["validate", manifestPath, "--json"]);
+            await RunWidgetStudioAsync(["preview", manifestPath, previewPath]);
+            await RunWidgetStudioAsync(["package", manifestPath, packagePath]);
+
+            AddSources([projectRoot]);
+            OutputPathText.Text = System.IO.Path.Combine(projectRoot, $"{slug}.paperboy.zip");
+            ApimProjectStatusText.Text =
+                $"Ready: {manifestPath}{Environment.NewLine}Package: {packagePath}";
+            SetStatus($"{name} project generated, validated, previewed, and packaged.");
+            AppendLog($"Widget project complete: {projectRoot}");
+            Process.Start(new ProcessStartInfo(previewPath) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            ApimProjectStatusText.Text = ex.Message;
+            SetStatus(ex.Message, isError: true);
+            AppendLog($"ERROR: {ex}");
+        }
     }
 
     private void CopyApimManifest_Click(object sender, RoutedEventArgs e)
@@ -880,6 +980,64 @@ public partial class MainWindow : Window
     {
         try
         {
+            var installedService = ResolveSiblingPath(
+                "Yumlog.APIM.Service",
+                "Yumlog.APIM.Service.exe");
+            if (File.Exists(installedService))
+            {
+                if (action.Equals("Stop", StringComparison.OrdinalIgnoreCase))
+                {
+                    var stopped = 0;
+                    foreach (var candidate in Process.GetProcessesByName("Yumlog.APIM.Service"))
+                    {
+                        try
+                        {
+                            if (string.Equals(
+                                candidate.MainModule?.FileName,
+                                installedService,
+                                StringComparison.OrdinalIgnoreCase))
+                            {
+                                candidate.Kill(entireProcessTree: true);
+                                candidate.WaitForExit(5000);
+                                stopped++;
+                            }
+                        }
+                        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+                        {
+                            AppendLog($"Could not inspect APIM process {candidate.Id}: {ex.Message}");
+                        }
+                        finally
+                        {
+                            candidate.Dispose();
+                        }
+                    }
+
+                    var stoppedStatus = stopped == 0
+                        ? "No installed Yumlog APIM service process was running."
+                        : $"Stopped {stopped} Yumlog APIM service process(es).";
+                    ApimServiceStatusText.Text = stoppedStatus;
+                    SetStatus(stoppedStatus);
+                    return;
+                }
+
+                var service = Process.Start(new ProcessStartInfo(installedService)
+                {
+                    UseShellExecute = true,
+                    WorkingDirectory = System.IO.Path.GetDirectoryName(installedService) ?? AppContext.BaseDirectory
+                }) ?? throw new InvalidOperationException("Failed to start installed Yumlog APIM service.");
+                await Task.Delay(1500);
+                if (service.HasExited)
+                {
+                    throw new InvalidOperationException($"Installed APIM service exited with code {service.ExitCode}.");
+                }
+
+                service.Dispose();
+                await ProbeApimEndpointAsync();
+                SetStatus("Installed Yumlog APIM service is running.");
+                AppendLog($"Installed APIM service started at {installedService}.");
+                return;
+            }
+
             var scriptPath = ResolveLauncherPath(scriptName);
             if (!File.Exists(scriptPath))
             {
@@ -950,7 +1108,7 @@ public partial class MainWindow : Window
             return "invalid-uri";
         }
 
-        var statusUri = AppendEndpointSegment(endpoint, "status");
+        var statusUri = AppendEndpointSegment(endpoint, "health");
         try
         {
             using var response = await ApimHealthClient.GetAsync(statusUri);
@@ -1020,6 +1178,159 @@ public partial class MainWindow : Window
         return "bridge-missing";
     }
 
+    private async Task<string> ProbeOcrReadinessAsync()
+    {
+        var command = ApimOcrBridgeText.Text.Trim();
+        var resolved = ResolveExecutablePath(command);
+        if (string.IsNullOrWhiteSpace(resolved))
+        {
+            var missing = RefreshOcrReadiness();
+            if (missing != "bridge-resolved")
+            {
+                return missing;
+            }
+
+            resolved = ResolveExecutablePath(command);
+        }
+
+        var startInfo = new ProcessStartInfo(resolved!)
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        startInfo.ArgumentList.Add("readiness");
+        startInfo.ArgumentList.Add("--ocr");
+        startInfo.ArgumentList.Add("auto");
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException($"Failed to start {resolved}.");
+
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        var output = (await outputTask).Trim();
+        var error = (await errorTask).Trim();
+        var status = process.ExitCode == 0
+            ? output
+            : $"OCR readiness failed ({process.ExitCode}): {error}";
+        ApimOcrReadinessText.Text = status;
+        return status;
+    }
+
+    private async Task RunWidgetStudioAsync(string[] arguments)
+    {
+        var studioExe = ResolveWidgetStudioExecutable();
+        ProcessStartInfo startInfo;
+
+        if (!string.IsNullOrWhiteSpace(studioExe))
+        {
+            startInfo = new ProcessStartInfo(studioExe)
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            foreach (var argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+        }
+        else
+        {
+            var project = ResolveSiblingPath("Yumlog.WidgetStudio", "Yumlog.WidgetStudio.csproj");
+            if (!File.Exists(project))
+            {
+                throw new FileNotFoundException("Widget Studio project was not found.", project);
+            }
+
+            startInfo = new ProcessStartInfo("dotnet")
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            startInfo.ArgumentList.Add("run");
+            startInfo.ArgumentList.Add("--project");
+            startInfo.ArgumentList.Add(project);
+            startInfo.ArgumentList.Add("-c");
+            startInfo.ArgumentList.Add("Release");
+            startInfo.ArgumentList.Add("--");
+            foreach (var argument in arguments)
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+        }
+
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Failed to start Widget Studio.");
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        var output = (await outputTask).Trim();
+        var error = (await errorTask).Trim();
+        if (!string.IsNullOrWhiteSpace(output))
+        {
+            AppendLog(output);
+        }
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"Widget Studio exited {process.ExitCode}: {error}");
+        }
+    }
+
+    private static string? ResolveWidgetStudioExecutable()
+    {
+        var installed = ResolveSiblingPath("Yumlog.WidgetStudio", "Yumlog.WidgetStudio.exe");
+        if (File.Exists(installed))
+        {
+            return installed;
+        }
+
+        var release = ResolveSiblingPath(
+            "Yumlog.WidgetStudio",
+            "bin",
+            "Release",
+            "net11.0",
+            "Yumlog.WidgetStudio.exe");
+        var debug = ResolveSiblingPath(
+            "Yumlog.WidgetStudio",
+            "bin",
+            "Debug",
+            "net11.0",
+            "Yumlog.WidgetStudio.exe");
+        return File.Exists(release) ? release : File.Exists(debug) ? debug : null;
+    }
+
+    private static string GetProjectOutputDirectory(string name)
+    {
+        var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        var baseDirectory = string.IsNullOrWhiteSpace(documents)
+            ? System.IO.Path.Combine(AppContext.BaseDirectory, "Projects")
+            : System.IO.Path.Combine(documents, "Yumlog Projects");
+        return System.IO.Path.Combine(baseDirectory, ToProjectSlug(name));
+    }
+
+    private static string ToProjectSlug(string name)
+    {
+        var builder = new StringBuilder();
+        foreach (var character in name.Trim())
+        {
+            var normalized = char.IsLetterOrDigit(character)
+                ? char.ToLowerInvariant(character)
+                : '-';
+            if (normalized != '-' || builder.Length == 0 || builder[^1] != '-')
+            {
+                builder.Append(normalized);
+            }
+        }
+
+        var slug = builder.ToString().Trim('-');
+        return string.IsNullOrWhiteSpace(slug) ? "yumlog-project" : slug;
+    }
+
     private static Uri AppendEndpointSegment(Uri endpoint, string segment)
     {
         return new Uri($"{endpoint.ToString().TrimEnd('/')}/{segment.TrimStart('/')}");
@@ -1045,9 +1356,23 @@ public partial class MainWindow : Window
 
     private static string ResolveSiblingPath(params string[] segments)
     {
-        var parts = new List<string> { AppContext.BaseDirectory, "..", "..", "..", ".." };
-        parts.AddRange(segments);
-        return System.IO.Path.GetFullPath(System.IO.Path.Combine(parts.ToArray()));
+        var roots = new[]
+        {
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "..")),
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..")),
+            AppContext.BaseDirectory
+        };
+
+        foreach (var root in roots)
+        {
+            var candidate = System.IO.Path.GetFullPath(System.IO.Path.Combine([root, .. segments]));
+            if (File.Exists(candidate) || Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return System.IO.Path.GetFullPath(System.IO.Path.Combine([roots[0], .. segments]));
     }
 
     private static string? ResolveExecutablePath(string command)
@@ -1080,6 +1405,12 @@ public partial class MainWindow : Window
                     return candidate;
                 }
             }
+        }
+
+        var installedCli = ResolveSiblingPath("Yumlog.Native.Cli", expanded);
+        if (File.Exists(installedCli))
+        {
+            return installedCli;
         }
 
         return null;

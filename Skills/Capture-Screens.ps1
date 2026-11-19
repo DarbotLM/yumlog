@@ -5,8 +5,10 @@ function Capture-Screens {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$false)]
+        [ValidateRange(1, 240)]
         [int]$Fps = 1,
         [Parameter(Mandatory=$false)]
+        [ValidateRange(1, 86400)]
         [int]$DurationSec = 1,
         [Parameter(Mandatory=$false)]
         [string]$OutDir = "./screenshots"

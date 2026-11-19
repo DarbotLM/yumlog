@@ -5,13 +5,20 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProjectDir = Resolve-Path $PSScriptRoot
 $Project = Join-Path $ProjectDir 'Yumlog.Native.fsproj'
+$CliProject = Resolve-Path (Join-Path $ProjectDir '..\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj')
 
 dotnet build $Project -c $Configuration --nologo
 if ($LASTEXITCODE -ne 0) { throw "Native build failed with exit code $LASTEXITCODE." }
+dotnet build $CliProject -c $Configuration --nologo
+if ($LASTEXITCODE -ne 0) { throw "Native CLI build failed with exit code $LASTEXITCODE." }
 
 $Dll = Join-Path $ProjectDir "bin\$Configuration\net10.0-windows10.0.26100.0\win-x64\Yumlog.Native.dll"
 if (-not (Test-Path $Dll)) {
     throw "Yumlog.Native.dll was not produced at $Dll"
+}
+$CliDll = Join-Path (Split-Path -Parent $CliProject) "bin\$Configuration\net10.0-windows10.0.26100.0\win-x64\Yumlog.Native.Cli.dll"
+if (-not (Test-Path $CliDll)) {
+    throw "Yumlog.Native.Cli.dll was not produced at $CliDll"
 }
 
 $WorkDir = Join-Path $ProjectDir 'obj\ExtensibilityTests'
@@ -148,20 +155,20 @@ if ($LASTEXITCODE -ne 0) { throw "Extensibility checks failed with exit code $LA
 
 Write-Host 'Running CLI surface checks...'
 
-$listOutput = dotnet $Dll extensions list --dir $ManifestDir
+$listOutput = dotnet $CliDll extensions list --dir $ManifestDir
 if ($LASTEXITCODE -ne 0) { throw "extensions list failed with exit code $LASTEXITCODE." }
 $listJson = $listOutput | ConvertFrom-Json
 if ($listJson.capabilities.Count -lt 1) { throw 'extensions list returned no capabilities.' }
 
-$mcpOutput = dotnet $Dll extensions mcp --dir $ManifestDir
+$mcpOutput = dotnet $CliDll extensions mcp --dir $ManifestDir
 if ($LASTEXITCODE -ne 0) { throw "extensions mcp failed with exit code $LASTEXITCODE." }
 $mcpJson = $mcpOutput | ConvertFrom-Json
 if ($mcpJson.tools.Count -lt 1) { throw 'extensions mcp returned no tools.' }
 
-dotnet $Dll extensions validate --dir $ManifestDir | Out-Null
+dotnet $CliDll extensions validate --dir $ManifestDir | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "extensions validate failed for $ManifestDir" }
 
-dotnet $Dll extensions validate --dir $BrokenDir | Out-Null
+dotnet $CliDll extensions validate --dir $BrokenDir | Out-Null
 if ($LASTEXITCODE -ne 1) { throw "extensions validate should return 1 for broken manifests, got $LASTEXITCODE." }
 
 Write-Host 'Yumlog.Native extensibility checks passed.'

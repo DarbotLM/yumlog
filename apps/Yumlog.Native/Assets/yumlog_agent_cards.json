@@ -1,0 +1,92 @@
+[
+  {
+    "id": "yumlog.video",
+    "title": "Video",
+    "role": "capture-and-record",
+    "description": "Record the desktop and inspect the latest local video and MDKG sidecar.",
+    "inputs": ["monitor", "durationSec", "fps", "backend"],
+    "outputs": ["mp4", "mdkg", "recordingStatus"],
+    "actions": ["record-video", "open-video-folder", "latest-video"],
+    "liveTileState": "ready|recording|saved|error"
+  },
+  {
+    "id": "yumlog.screenshot",
+    "title": "Screenshot",
+    "role": "screen-evidence",
+    "description": "Capture reviewable screen evidence and analyze the latest image locally.",
+    "inputs": ["monitor", "imageFormat", "ocrMode"],
+    "outputs": ["png", "analysisJson", "sha256"],
+    "actions": ["capture-screen", "analyze-latest-image", "open-screenshot-folder"],
+    "liveTileState": "ready|capturing|captured|analyzing|error"
+  },
+  {
+    "id": "yumlog.audio",
+    "title": "Audio",
+    "role": "audio-harvest",
+    "description": "Extract an audio track from local recordings for optional downstream voice workflows.",
+    "inputs": ["sourceVideo", "codec"],
+    "outputs": ["m4a", "audioMetadata"],
+    "actions": ["extract-audio", "open-audio-folder"],
+    "liveTileState": "ready|extracting|saved|source-missing|error"
+  },
+  {
+    "id": "yumlog.transcript",
+    "title": "Transcript",
+    "role": "screen-transcript",
+    "description": "Build a portable transcript from the latest MDKG runbook; speech transcription remains an opt-in voice-model integration.",
+    "inputs": ["mdkg", "analysisJson", "runbookProofs"],
+    "outputs": ["markdownTranscript", "jsonTranscript", "citations"],
+    "actions": ["build-transcript", "open-transcript-folder"],
+    "liveTileState": "ready|building|saved|source-missing|error"
+  },
+  {
+    "id": "yumlog.agents",
+    "title": "Agents",
+    "role": "agent-card-catalog",
+    "description": "Discover native extension cards and export the combined MCP capability manifest.",
+    "inputs": ["extensionManifests[]", "catalogQuery"],
+    "outputs": ["agentCards", "capabilityCatalog", "mcpManifest", "diagnostics"],
+    "actions": ["refresh-agents", "export-agent-cards", "export-mcp"],
+    "liveTileState": "empty|discovered|validated|exported|error"
+  },
+  {
+    "id": "yumlog.voices",
+    "title": "Voices",
+    "role": "voice-capability-discovery",
+    "description": "Discover voice/audio capability providers and verify local runtime readiness without provisioning or downloading models.",
+    "inputs": ["extensionCatalog", "providerQuery"],
+    "outputs": ["voiceCapabilities", "runtimeReadiness"],
+    "actions": ["discover-voices", "check-audio-runtime"],
+    "liveTileState": "empty|discovering|ready|unavailable"
+  },
+  {
+    "id": "yumlog.insights",
+    "title": "Insights",
+    "role": "evidence-reasoning",
+    "description": "Verify MDKG integrity, build cited runbooks, and run local reasoning when an on-device model is installed.",
+    "inputs": ["mdkg", "question", "modelDir", "provider"],
+    "outputs": ["runbook", "proofVerification", "reasoningResult", "selfTest"],
+    "actions": ["build-runbook", "run-local-insight", "run-selftest"],
+    "liveTileState": "ready|reasoning|verified|model-missing|error"
+  },
+  {
+    "id": "yumlog.harvest",
+    "title": "Harvest",
+    "role": "evidence-packaging",
+    "description": "Collect the latest local evidence into one portable session with hashes and an auditable manifest.",
+    "inputs": ["video", "screenshots[]", "audio", "transcripts[]", "mdkg[]"],
+    "outputs": ["harvestSession", "manifestJson", "sha256"],
+    "actions": ["harvest-session", "open-harvest-folder"],
+    "liveTileState": "empty|ready|harvesting|saved|error"
+  },
+  {
+    "id": "yumlog.settings",
+    "title": "Settings",
+    "role": "local-runtime-settings",
+    "description": "Review package identity, OCR readiness, extension roots, local config, and application version.",
+    "inputs": ["configPath", "ocrMode", "extensionDir"],
+    "outputs": ["runtimeStatus", "packageIdentity", "configFile"],
+    "actions": ["check-ocr", "load-ocr-model", "open-config", "export-agent-cards"],
+    "liveTileState": "ready|checking|configured|error"
+  }
+]

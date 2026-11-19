@@ -25,15 +25,24 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 11.0.x
-          dotnet-quality: preview
       - name: Build Paperboy desktop app
         run: dotnet build .\apps\Paperboy.Desktop\Paperboy.Desktop.csproj -c Release
       - name: Build Paperboy MCP app
         run: dotnet build .\apps\Paperboy.Mcp\Paperboy.Mcp.csproj -c Release
+      - name: Build native desktop app
+        run: dotnet build .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release
+      - name: Build native CLI
+        run: dotnet build .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release
+      - name: Run native self-test
+        shell: pwsh
+        run: |
+          $exe = ".\apps\Yumlog.Native.Cli\bin\Release\net10.0-windows10.0.26100.0\win-x64\Yumlog.Native.Cli.exe"
+          & $exe selftest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Bundle and extension contracts
         run: |
           Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
-          $result = Invoke-Pester -Path .\Skills\Test-PaperboyBundle.Tests.ps1, .\Skills\Test-PaperboyExtensions.Tests.ps1 -Output Detailed -PassThru
+          $result = Invoke-Pester -Path .\Skills\Test-ScreenSkills.Tests.ps1, .\Skills\Test-PaperboyBundle.Tests.ps1, .\Skills\Test-PaperboyExtensions.Tests.ps1 -Output Detailed -PassThru
           if ($result.FailedCount -gt 0 -or $result.PassedCount -eq 0) { exit 1 }
       - name: Build APIM foundation
         run: dotnet build .\apps\Yumlog.APIM.Service\Yumlog.APIM.Service.fsproj -c Release
@@ -46,3 +55,13 @@ jobs:
           .\apps\Yumlog.Native\Test-YumlogNativeExtensibility.ps1
           .\launchers\Test-YumlogNativeMdkgRoundTrip.ps1
           .\launchers\Test-YumlogNativeHandoff.ps1
+      - name: Build and smoke-test production package
+        run: |
+          .\launchers\Build-YumlogProduction.ps1 -DotnetPath dotnet
+          .\launchers\Test-YumlogProductionPackage.ps1
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check Yumlog NPU emulator
+        run: cargo check --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml
+      - name: Test Yumlog NPU emulator
+        run: cargo test --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml

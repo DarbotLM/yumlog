@@ -61,7 +61,7 @@ public sealed record WidgetStudioProject
     public string SchemaVersion { get; init; } = WidgetStudioSchema.Version;
     public string ProjectId { get; init; } = "";
     public string Name { get; init; } = "";
-    public string Version { get; init; } = "0.1.0";
+    public string Version { get; init; } = "0.5.0";
     public string Owner { get; init; } = "";
     public WidgetDefinition Widget { get; init; } = new();
     public WidgetPackageDefinition Package { get; init; } = new();

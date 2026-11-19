@@ -3,8 +3,10 @@ function Record-Screen {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$false)]
+        [ValidateRange(1, 240)]
         [int]$Fps = 30,
         [Parameter(Mandatory=$false)]
+        [ValidateRange(1, 86400)]
         [int]$DurationSec = 10,
         [Parameter(Mandatory=$false)]
         [string]$OutFile = "./screenrecord.mp4"

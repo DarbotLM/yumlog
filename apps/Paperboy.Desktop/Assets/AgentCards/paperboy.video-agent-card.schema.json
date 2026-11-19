@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://darbotlabs.github.io/yumlog/paperboy.video-agent-card.schema.json",
+  "title": "Paperboy Video Agent Card",
+  "description": "Full adaptive video evidence card shell. Extends the Paperboy Agent Card contract without changing its required fields.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schemaVersion",
+    "id",
+    "title",
+    "role",
+    "description",
+    "inputs",
+    "outputs",
+    "actions",
+    "liveTileState",
+    "shell",
+    "adaptiveSizes",
+    "media",
+    "provenance"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "type": "string", "const": "1.0" },
+    "id": { "type": "string", "pattern": "^paperboy\\.video\\.[a-z0-9.-]+$" },
+    "title": { "type": "string" },
+    "role": { "type": "string" },
+    "description": { "type": "string" },
+    "inputs": { "type": "array", "items": { "type": "string" } },
+    "outputs": { "type": "array", "items": { "type": "string" } },
+    "actions": { "type": "array", "items": { "type": "string" } },
+    "liveTileState": { "type": "string" },
+    "shell": {
+      "type": "object",
+      "required": ["aspectRatio", "baseWidth", "baseHeight", "radius", "flip", "front", "back"],
+      "properties": {
+        "aspectRatio": { "type": "string", "const": "4:3" },
+        "baseWidth": { "type": "integer", "const": 720 },
+        "baseHeight": { "type": "integer", "const": 540 },
+        "radius": { "type": "integer", "minimum": 0 },
+        "borderColor": { "type": "string" },
+        "accent": { "type": "string" },
+        "background": { "type": "string" },
+        "flip": { "type": "string" },
+        "front": { "type": "array", "items": { "type": "string" } },
+        "back": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "adaptiveSizes": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["name", "width", "height", "cardsPerViewport"],
+        "properties": {
+          "name": { "type": "string", "enum": ["small", "medium", "large", "presentation"] },
+          "width": { "type": "integer", "minimum": 1 },
+          "height": { "type": "integer", "minimum": 1 },
+          "cardsPerViewport": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "media": {
+      "type": "object",
+      "required": ["kind", "path", "fileName", "bytes", "lastWriteTimeUtc", "sha256"],
+      "properties": {
+        "kind": { "type": "string", "const": "video" },
+        "path": { "type": "string" },
+        "fileName": { "type": "string" },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "lastWriteTimeUtc": { "type": "string", "format": "date-time" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "mdkgPath": { "type": "string" },
+        "mdkgSha256": { "type": "string" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["producer", "version", "generatedUtc", "localOnly", "verification"],
+      "properties": {
+        "producer": { "type": "string" },
+        "version": { "type": "string" },
+        "generatedUtc": { "type": "string", "format": "date-time" },
+        "localOnly": { "type": "boolean" },
+        "verification": { "type": "string" }
+      }
+    }
+  }
+}

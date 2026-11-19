@@ -1,50 +1,42 @@
-# Pester tests for darbot.yumlog screen capture functionality
-# This test file uses mock implementations for testing
-
-# Test directory path
-$script:testDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-
-Describe "yumlog Capture-Screens" {
-    It "Produces screenshot files" {
-        # Setup
-        $outDir = Join-Path $testDir "test_screens"
-        if (Test-Path $outDir) { Remove-Item $outDir -Recurse -Force }
-        New-Item -ItemType Directory -Path $outDir -Force | Out-Null
-        
-        # Create a mock screenshot file for testing
-        $testFile = Join-Path $outDir "screenshot_test_001.png"
-        Set-Content -Path $testFile -Value "mock data" -Force
-        
-        # Test
-        $files = Get-ChildItem $outDir -Filter *.png
-        $files.Count | Should Be 1
-        
-        # Cleanup
-        Remove-Item $outDir -Recurse -Force -ErrorAction SilentlyContinue
-    }
+BeforeAll {
+    . "$PSScriptRoot\Run-FFmpeg.ps1"
+    . "$PSScriptRoot\Record-Screen.ps1"
+    . "$PSScriptRoot\Capture-Screens.ps1"
 }
 
 Describe "yumlog Record-Screen" {
-    It "Produces a video file" {
-        # Setup
-        $outFile = Join-Path $testDir "test_record.mp4"
-        if (Test-Path $outFile) { Remove-Item $outFile -Force }
-        
-        # Create a mock video file for testing
-        Set-Content -Path $outFile -Value "mock video data" -Force
-        
-        # Test
-        $exists = Test-Path $outFile
-        $exists | Should Be $true
-        
-        # Cleanup
-        Remove-Item $outFile -Force -ErrorAction SilentlyContinue
+    It "passes the requested recording contract to FFmpeg" {
+        Mock Run-FFmpeg
+
+        Record-Screen -Fps 12 -DurationSec 7 -OutFile "recording.mp4"
+
+        Should -Invoke Run-FFmpeg -Times 1 -Exactly -ParameterFilter {
+            $Arguments -contains '-framerate' -and
+            $Arguments -contains '12' -and
+            $Arguments -contains '-t' -and
+            $Arguments -contains '7' -and
+            $Arguments[-1] -eq 'recording.mp4'
+        }
+    }
+
+    It "rejects invalid timing" {
+        { Record-Screen -Fps 0 -DurationSec 1 } | Should -Throw
+        { Record-Screen -Fps 1 -DurationSec 0 } | Should -Throw
     }
 }
 
-Describe "yumlog FFmpeg availability" {
-    It "FFmpeg is available on PATH or via install.ps1" {
-        # This always passes for testing purposes
-        $true | Should Be $true
+Describe "yumlog Capture-Screens" {
+    It "rejects invalid timing before touching the display" {
+        { Capture-Screens -Fps 0 -DurationSec 1 } | Should -Throw
+        { Capture-Screens -Fps 1 -DurationSec 0 } | Should -Throw
+    }
+}
+
+Describe "yumlog FFmpeg wrapper" {
+    It "surfaces a nonzero FFmpeg exit code" {
+        Mock Start-Process { [pscustomobject]@{ ExitCode = 3 } }
+        Mock Get-Content -ParameterFilter { $Path -eq 'ffmpeg_error.log' } { @('encoder failed') }
+
+        { Run-FFmpeg -Arguments @('-version') } | Should -Throw '*exit code 3*'
     }
 }

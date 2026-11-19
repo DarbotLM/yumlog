@@ -51,11 +51,11 @@ module NativeHandoff =
     let private snapshot input =
         sourceFiles input
         |> Array.mapi (fun index path ->
-            let extension = Path.GetExtension(path) |> Option.ofObj |> Option.defaultValue ""
+            let extension = Path.GetExtension(path) |> orEmptyIfNull
             let relative = $"frames/{index + 1:D6}{extension.ToLowerInvariant()}"
             let info = fileInfo "source" relative path
             path,
-            { SourcePath = Path.GetFileName(path) |> Option.ofObj |> Option.defaultValue ""
+            { SourcePath = Path.GetFileName(path) |> orEmptyIfNull
               Path = info.Path
               Sha256 = info.Sha256
               SizeBytes = info.SizeBytes })

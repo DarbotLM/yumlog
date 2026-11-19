@@ -32,11 +32,18 @@ darbot.yumlog is a Windows capture and local automation toolkit. It includes the
 ## Features
 
 * **Native F# CLI:** `apps\Yumlog.Native` provides capture, record, analyze, follow, orchestrate, config, and extension catalog commands.
+* **Split Native Hosts:** `apps\Yumlog.Native` is the packaged desktop host; `apps\Yumlog.Native.Cli` is the automation host with capture, HEVC recording, runbooks, reasoning, handoff, readiness, and extension commands.
 * **MDKG Container Format:** `Mdkg.fs` implements standalone timestamped metadata containers with typed producers, validation, and extension-catalog provenance. MP4 metadata muxing is a separate integration design, not an automatic side effect of writing a sidecar. See [MDKG-SPEC.md](apps/Yumlog.Native/hevc-swarm-out/MDKG-SPEC.md).
 * **Paperboy:** WPF desktop bundling, model-management and live-tile UI, capability/extension catalogs, and a companion stdio MCP host. See the [Paperboy guide](apps/Paperboy.Desktop/README.md).
 * **APIM/ACP Service:** Local metadata catalogs and authenticated envelope scaffolding, with Windows Service launchers. See [service coverage and limitations](apps/Yumlog.APIM.Service/README.md).
 * **Widget Studio:** Versioned widget contracts, semantic validation, static HTML previews, capability indexes, and package export. See the [authoring guide](apps/Yumlog.WidgetStudio/README.md).
-* **Screen Recording:** Record the desktop at configurable FPS and duration to MP4 using FFmpeg.
+* **Screen Recording:** Record the desktop at configurable FPS and duration.
+* **Hardware HEVC Recording:** Windows Graphics Capture into NVENC, with automatic fallback to x265 then FFmpeg (`--backend auto|nvenc|x265|ffmpeg`), including a lossless mode.
+* **MDKG Container Format:** `Mdkg.fs` implements the `.mdkg` binary layered metadata track format for frame-accurate HEVC/MP4 metadata embedding. Layers: `Timing`(1), `OcrText`(2), `UiAffordance`(3), `SemanticGraph`(4), `InputEvent`(5). Unregistered layer IDs are skipped, so the format is forward-compatible. See `apps/Yumlog.Native/hevc-swarm-out/MDKG-SPEC.md`.
+* **Verifiable Runbooks:** `MdkgIntel.fs` turns a recording into ordered steps where every claim carries a resolvable `mdkg://` citation, so a runbook can be checked rather than trusted.
+* **On-Device Reasoning:** `reason` answers questions about a recording using a local model through ONNX Runtime GenAI. Fully offline. See [`docs/ON-DEVICE-REASONING.md`](docs/ON-DEVICE-REASONING.md).
+* **Live Screen Watching:** `watch` observes the screen and narrates on an interval, skipping frames below a change threshold.
+* **Built-in Self Test:** `selftest` runs 16 correctness checks over the container, intelligence layer, and hardware probes, including a negative control on timing coverage.
 * **Screenshot Capture:** Capture periodic screenshots at configurable FPS and duration.
 * **Screen Analysis:** Emit JSON image metadata, hashes, dimensions, and OCR provider status.
 * **Follow-Me Manifests:** Capture frame sequences, estimate visual changes, and emit navigation-step manifests.
@@ -45,6 +52,8 @@ darbot.yumlog is a Windows capture and local automation toolkit. It includes the
 * **Scriptable:** Designed for automation and integration in CI/CD or test workflows.
 * **Configurable:** PowerShell settings live in `config\tools.json`, native settings in `config\yumlog.native.json`, and APIM settings in its component configuration.
 * **Testable:** Pester suites, native F# round-trip scripts, APIM loopback checks, and Widget Studio's built-in `self-test`.
+* **Local-first:** Capture and reasoning stay local; dependency/model downloads and explicitly configured connectors may use the network.
+* **Testable:** Pester suites, native `selftest`/contract suites, APIM loopback checks, and Widget Studio self-test.
 
 ## Project Structure
 
@@ -65,11 +74,18 @@ darbot.yumlog/
 │   ├── tools.json          # PowerShell configuration
 │   └── yumlog.native.json  # Native CLI configuration
 ├── apps/
-│   ├── Yumlog.Native/      # Native F# CLI and metadata contracts
+│   ├── Yumlog.Native/      # Packaged native desktop host and shared implementation
+│   ├── Yumlog.Native.Cli/  # Runnable native automation host
 │   ├── Paperboy.Desktop/   # WPF UI and shared capability implementation
 │   ├── Paperboy.Mcp/       # Stdio MCP host
 │   ├── Yumlog.APIM.Service/ # Local HTTP/ACP service
-│   └── Yumlog.WidgetStudio/ # Widget authoring CLI
+│   ├── Yumlog.WidgetStudio/ # Widget authoring CLI
+│   └── Yumlog.NpuEmulator/ # Rust/Tauri NPU-emulation runtime
+├── docs/
+│   ├── NATIVE-CLI.md       # Native CLI command reference
+│   └── ON-DEVICE-REASONING.md
+├── hevc-swarm-out/
+│   └── baseline/           # CDP drivers and recording artifacts
 ├── .github/                # GitHub configuration
 │   └── copilot-instructions.md  # GitHub Copilot instructions
 ├── yumlog-manager.html     # Web-based management interface
@@ -128,13 +144,18 @@ manual steps.
 ### Native F# CLI
 
 ```powershell
-dotnet build .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- capture --out-dir .\screenshots --duration 1
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- analyze --input .\screenshots --ocr auto
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- follow --out-dir .\yumlogs\follow --duration 10 --ocr auto
-.\launchers\Build-YumlogNativeMsix.ps1 `
-  -ProjectPath .\apps\Yumlog.Native\Yumlog.Native.fsproj `
-  -OutputRoot .\dist\Yumlog.Native -Configuration Release -NoSign
+dotnet build .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release
+$exe = ".\apps\Yumlog.Native.Cli\bin\Release\net10.0-windows10.0.26100.0\win-x64\Yumlog.Native.Cli.exe"
+
+& $exe capture --out-dir .\screenshots --duration 1
+& $exe record  --out-file .\out.mp4 --timed-metadata-out .\out.mdkg --duration 10 --fps 30
+& $exe analyze --input .\screenshots --ocr auto
+& $exe follow  --out-dir .\yumlogs\follow --duration 10 --ocr auto
+& $exe runbook --input .\out.mdkg --markdown-out .\runbook.md
+& $exe reason  --input .\out.mdkg --provider cpu --question "What happened in this recording?"
+& $exe selftest
+
+dotnet msbuild .\apps\Yumlog.Native\Yumlog.Native.fsproj -t:PackageMsix -p:Configuration=Release
 ```
 
 The native CLI targets `net10.0-windows10.0.26100.0`. Its capture/analysis commands run without PowerShell, while packaging and validation helpers are PowerShell scripts. OCR uses the managed Windows App SDK AI projections; `raw-com` is a compatibility alias for `windows-ai`, not a separate raw-vtable implementation. OCR readiness depends on runtime registration, package identity, supported hardware, and model availability.
@@ -146,6 +167,10 @@ project `PackageMsix` target needs missing Paperboy branding assets and is not
 the recommended packaging path.
 
 The [native extension guide](apps/Yumlog.Native/EXTENSIBILITY.md) documents manifest loading, validation, and MCP-shaped catalog export. Exporting a capability declaration does not execute it or start an MCP server.
+
+Build output is ignored and must not be trusted as source. Build the native CLI
+before `selftest`; unknown CLI options are rejected rather than reported as
+successful no-ops.
 
 ### Screenshot Capture
 

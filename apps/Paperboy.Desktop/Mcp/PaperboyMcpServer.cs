@@ -201,6 +201,7 @@ public static class PaperboyMcpServer
             "paperboy.pmm.run" => ContentResponse(id, await PmmRunAsync(args, pmm, cancellationToken)),
             "paperboy.cards.list" => ContentResponse(id, CardsJson(args, cards)),
             "paperboy.cards.schema" => ContentResponse(id, cards.SchemaJson),
+            "paperboy.cards.videoSchema" => ContentResponse(id, cards.VideoSchemaJson),
             "paperboy.capabilities.list" => ContentResponse(id, CapabilityListJson(args)),
             "paperboy.extensions.list" => ContentResponse(id, ExtensionListJson(args)),
             "paperboy.extensions.describe" => ContentResponse(id, ExtensionDescribeJson(args)),
@@ -509,6 +510,7 @@ public static class PaperboyMcpServer
             ["includeExtensions"] = BooleanSchema("Merge agent cards contributed by discovered Paperboy extensions.")
         }),
         Tool("paperboy.cards.schema", "Return the Paperboy agent-card JSON schema.", [], new JsonObject()),
+        Tool("paperboy.cards.videoSchema", "Return the full Paperboy adaptive video Agent Card and 4:3 flip-card shell schema.", [], new JsonObject()),
         Tool("paperboy.capabilities.list", "Enumerate Paperboy's capability index: built-in MCP tools plus capabilities contributed by discovered extensions, connectors, skills, and workflows. Optional: kind, tag, includeBuiltIn, refresh.", [], new JsonObject
         {
             ["kind"] = EnumSchema(PaperboyCapabilityKinds.Known),
@@ -606,6 +608,12 @@ public static class PaperboyMcpServer
             },
             new JsonObject
             {
+                ["uri"] = "paperboy://cards/video-schema",
+                ["name"] = "Paperboy Video Agent Card Schema",
+                ["mimeType"] = "application/schema+json"
+            },
+            new JsonObject
+            {
                 ["uri"] = "paperboy://capabilities",
                 ["name"] = "Paperboy Capability Index",
                 ["mimeType"] = "application/json",
@@ -649,6 +657,7 @@ public static class PaperboyMcpServer
         {
             "paperboy://cards" => ("application/json", cards.ToJson()),
             "paperboy://cards/schema" => ("application/schema+json", cards.SchemaJson),
+            "paperboy://cards/video-schema" => ("application/schema+json", cards.VideoSchemaJson),
             "paperboy://capabilities" => ("application/json", Capabilities.IndexJson()),
             "paperboy://extensions" => ("application/json", Capabilities.ExtensionsJson()),
             "paperboy://extensions/schema" => ("application/schema+json", PaperboyExtensionSchema.Json),
@@ -771,6 +780,7 @@ public static class PaperboyMcpServer
     [
         "paperboy://cards",
         "paperboy://cards/schema",
+        "paperboy://cards/video-schema",
         "paperboy://capabilities",
         "paperboy://extensions",
         "paperboy://extensions/schema",

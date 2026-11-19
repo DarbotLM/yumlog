@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.IO;
 
 namespace Paperboy.Desktop.Cards;
 
@@ -207,6 +208,24 @@ public sealed class AgentCardCatalog
     ];
 
     public string FoundryModelCardsJson() => JsonSerializer.Serialize(FoundryModelCards, JsonOptions);
+
+    public string VideoSchemaJson
+    {
+        get
+        {
+            var path = System.IO.Path.Combine(
+                AppContext.BaseDirectory,
+                "Assets",
+                "AgentCards",
+                "paperboy.video-agent-card.schema.json");
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException("Paperboy video Agent Card schema was not found.", path);
+            }
+
+            return File.ReadAllText(path);
+        }
+    }
 
     public string SchemaJson => """
     {

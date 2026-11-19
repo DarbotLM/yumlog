@@ -2,7 +2,13 @@
 
 ## Project Overview
 
-Darbot Yumlog is a Windows local-first capture and automation toolkit with a native F# CLI, MDKG metadata contracts, Paperboy WPF/MCP capabilities, a local APIM/ACP service foundation, Widget Studio authoring, and PowerShell utilities.
+Darbot Yumlog is a Windows local-first capture and automation toolkit. It combines
+the lightweight PowerShell/FFmpeg path with a split native stack: a packaged WPF
+desktop host (`apps/Yumlog.Native`) and a console automation host
+(`apps/Yumlog.Native.Cli`). The native stack supports hardware HEVC recording,
+typed MDKG metadata, verifiable runbooks, offline reasoning, handoffs, readiness
+probes, and extension catalogs. Paperboy, APIM/ACP, and Widget Studio provide
+delivery, integration, and widget-authoring surfaces.
 
 ## Core Principles
 
@@ -11,6 +17,7 @@ Darbot Yumlog is a Windows local-first capture and automation toolkit with a nat
 - **Efficient**: Optimize for performance using FFmpeg
 - **Reliable**: Ensure consistent behavior across runs
 - **Robust**: Handle edge cases and errors gracefully
+- **Evidence over assertion**: Claims about a recording should carry a resolvable citation
 
 ## Architecture
 
@@ -24,7 +31,10 @@ Darbot Yumlog is a Windows local-first capture and automation toolkit with a nat
 ### Directory Structure
 - `Skills/`: Reusable PowerShell functions/modules (core functionality)
 - `launchers/`: Top-level PowerShell scripts for user interaction
-- `config/`: Configuration files (tools.json)
+- `apps/Yumlog.Native/`: F# implementation library (capture, encode, mdkg, reasoning)
+- `apps/Yumlog.Native.Cli/`: Runnable native CLI entry point
+- `docs/`: `NATIVE-CLI.md`, `ON-DEVICE-REASONING.md`
+- `config/`: Configuration files (`tools.json`, `yumlog.native.json`)
 - `.tools/`: Auto-installed dependencies (FFmpeg)
 - `apps/Yumlog.Native/`: .NET 10 Windows F# CLI, OCR, MDKG, and extension catalog
 - `apps/Paperboy.Desktop/`: .NET 11 WPF UI, capabilities, services, and MCP implementation
@@ -39,6 +49,25 @@ Darbot Yumlog is a Windows local-first capture and automation toolkit with a nat
 3. **Run-FFmpeg.ps1**: FFmpeg execution wrapper
 4. **yumlog.ps1**: Unified CLI for all operations
 5. **yumlog-manager.html**: Web-based UI for managing recordings
+6. **WgcCapture.fs / NvencHevc.fs / X265Encoder.fs / HevcMux.fs**: Native capture and HEVC encode path
+7. **Mdkg.fs / MdkgIntel.fs**: `.mdkg` container plus timeline, citations, and runbooks
+8. **OnDeviceLlm.fs**: Offline model reasoning and live screen watching
+9. **SelfTest.fs**: Built-in 16-check correctness suite
+
+## Working on the native stack
+
+- Build `apps/Yumlog.Native.Cli` for automation and `apps/Yumlog.Native` for the packaged desktop host.
+- `bin/`, `obj/`, downloaded tools, and generated media are not source. **Rebuild before trusting `selftest`**.
+- `selftest` JSON keys are `passed`, `passedCount`, `failedCount`, `cases`.
+- CLI JSON output has trailing non-JSON text; slice between the first `{` and last `}`.
+- Reject unknown or incomplete CLI arguments; never report success for a misspelled flag.
+- To make a fact visible to `reason`, put it in the grounding string in `OnDeviceLlm.fs`. Runbook proofs are **not** sent to the model.
+
+### Testing the screen-observation features
+
+**Never fabricate screen content to test screen observation.** Generating synthetic full-screen windows proves only that the tool can see the fabrication, and it hijacks the operator's display. Validate `watch` and `follow` against real application activity, with explicit consent.
+
+Prefer control experiments over single passing cases. Frame-rate reporting is verified at 12, 15, and 30 fps precisely because one passing rate cannot distinguish a correct read from a latched constant.
 
 ## Development Guidelines
 

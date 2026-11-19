@@ -2,7 +2,12 @@
 
 ## Screen Capture & Recording
 
-darbot.yumlog provides local Windows tools for desktop screen capture, recording, and lightweight screen analysis. The PowerShell tools remain supported alongside the native `Yumlog.Native` F# CLI for capture, recording orchestration, analysis manifests, and follow-me step extraction.
+darbot.yumlog provides local Windows tools for desktop screen capture, recording, and analysis. The PowerShell tools remain available, `Yumlog.Native` is the packaged desktop host, and `Yumlog.Native.Cli` is the no-PowerShell automation path for capture, HEVC recording, analysis manifests, follow-me extraction, verified handoffs, runbooks, and on-device reasoning.
+
+Two reference documents cover the native path in depth:
+
+- [`docs/NATIVE-CLI.md`](docs/NATIVE-CLI.md) — full command reference, flags, config, and known rough edges
+- [`docs/ON-DEVICE-REASONING.md`](docs/ON-DEVICE-REASONING.md) — how grounding works, frame-rate accuracy, and measured Edge Prompt API behaviour
 
 Paperboy is Yumlog's lightweight courier layer: it can sample recordings with
 half-step navigation and can pack files into small manifest-backed bundles that
@@ -104,25 +109,43 @@ unchanged and may provision when explicitly invoked with OCR.
 
 #### Using the native F# CLI
 
+The runnable binary is built from `apps\Yumlog.Native.Cli`. The `apps\Yumlog.Native` project is the implementation library.
+
 ```powershell
 # Build the native CLI
-dotnet build .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release
+dotnet build .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release
+$exe = ".\apps\Yumlog.Native.Cli\bin\Release\net10.0-windows10.0.26100.0\win-x64\Yumlog.Native.Cli.exe"
 
 # Capture a fast all-monitor screenshot sequence
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- capture --out-dir .\screenshots --duration 1
+& $exe capture --out-dir .\screenshots --duration 1
 
-# Record desktop video through FFmpeg without PowerShell entry points
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- record --out-file .\yumlogs\native.mp4 --duration 10 --fps 30
+# Record HEVC video AND the .mdkg metadata sidecar that powers runbook/reason
+& $exe record --out-file .\yumlogs\native.mp4 --timed-metadata-out .\yumlogs\native.mdkg `
+              --duration 10 --fps 30 --backend auto
 
 # Analyze image files and emit JSON metadata
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- analyze --input .\screenshots --ocr auto
+& $exe analyze --input .\screenshots --ocr auto
 
 # Capture follow-me frames and write a follow manifest
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- follow --out-dir .\yumlogs\follow --duration 10 --ocr auto
+& $exe follow --out-dir .\yumlogs\follow --duration 10 --ocr auto
+
+# Turn a recording into a runbook where every claim carries a resolvable citation
+& $exe runbook --input .\yumlogs\native.mdkg --markdown-out .\runbook.md
+
+# Ask an on-device model a question about the recording
+& $exe reason --input .\yumlogs\native.mdkg --provider cpu `
+              --question "At what frame rate was this captured, and were any frames dropped?"
+
+# Watch the live screen and narrate on an interval
+& $exe watch --duration 30 --fps 2 --narrate-every 10
+
+# List installed on-device models, and run the built-in correctness suite
+& $exe models
+& $exe selftest
 
 # Show or initialize native config
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- config show
-dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release -- config init --force
+& $exe config show
+& $exe config init --force
 
 # Build an unsigned MSIX without installing or changing certificate trust
 .\launchers\Build-YumlogNativeMsix.ps1 `
@@ -191,6 +214,104 @@ dotnet run --project .\apps\Yumlog.WidgetStudio\Yumlog.WidgetStudio.csproj -c Re
 Widget Studio supports schema versions `1.0` and `1.1`, semantic validation,
 capability indexes, static HTML previews, and `.widget.zip` exports. It is an
 authoring CLI, not an always-running widget host.
+
+> `--timed-metadata-out` is what makes a recording answerable. Without it you get
+> video only, and `runbook` and `reason` have nothing to read.
+
+> Unknown CLI options are rejected with exit code 1. Correct typos before retrying
+> automation.
+
+#### Verifiable runbooks
+
+`runbook` converts an `.mdkg` sidecar into ordered steps, each carrying proofs —
+claim / path / value triples where the path resolves back into the file:
+
+```json
+{ "claim": "frame index at this step",
+  "path":  "mdkg://timing@0#/frameIndex",
+  "value": "0" }
+```
+
+Because every proof re-resolves against the source, a runbook can be checked
+rather than believed. Measured on `hevc-swarm-out\baseline\artifacts\r2-churn2.mdkg`:
+155 steps, 310 proofs (two per step).
+
+#### On-device reasoning
+
+`reason` answers questions about a recording using a local model through ONNX
+Runtime GenAI. Nothing leaves the machine, and Yumlog loads model weights
+directly rather than calling Edge's model service.
+
+Frame-rate reporting is verified across three independent rates — 12 fps, 15 fps,
+and 30 fps each produce the correct answer with zero coverage overlaps. Answer
+phrasing varies between runs, so assert on content rather than exact wording. See
+[`docs/ON-DEVICE-REASONING.md`](docs/ON-DEVICE-REASONING.md) for how grounding is
+assembled and why runbook proofs are *not* visible to the model.
+
+#### Built-in correctness suite
+
+`selftest` runs 16 checks across the MDKG container, the intelligence layer, and
+hardware probes, and returns JSON with keys `passed`, `passedCount`,
+`failedCount`, and `cases`. `mdkg.timing.coverageNoOverlap` ships with a negative
+control so it cannot pass vacuously.
+
+Build output is excluded from source control. Build the CLI before trusting
+`selftest`, package, or UI validation results.
+
+`Yumlog.Native.Cli` is local-first and uses `config\yumlog.native.json` by default. Capture uses Windows Graphics Capture with a Direct3D path; recording encodes HEVC through NVENC or x265, with the explicit FFmpeg backend retained for compatibility (`--backend auto|nvenc|x265|ffmpeg`). `selftest` reports NVENC availability via `probe.nvenc.driverDll`. OCR uses the Windows AI Text Recognition stack: `--ocr auto`, `--ocr windows-ai`, and `--ocr raw-com` (alias of `windows-ai`) run the full recognition pipeline and return lines, words, polygon bounds, and confidence values. The pipeline is implemented in F# (`WindowsAiOcr.fs`) on the managed `Microsoft.WindowsAppSDK.AI` projections. Windows AI OCR requires Windows App SDK runtime registration, package/sparse-package identity with `systemAIModels`, compatible NPU hardware, and an available model; the unpackaged executable reports `CapabilityMissing` by design. `apps\Yumlog.Native\Package.appxmanifest` declares the capability and aliases the packaged app.
+
+`Mdkg.fs` implements the `.mdkg` binary container format (Magic: `MDKG\r\n\x1A\n`, version 1.0). MDKG is a layered metadata track format designed to carry frame-accurate metadata alongside HEVC/MP4 recordings. Layer samples align to the `MovieTimescale` (10,000,000 ticks/sec), and unregistered layer IDs are skipped rather than treated as corruption, so the format is forward-compatible.
+
+| Layer | ID | Carries |
+|---|---|---|
+| `Timing` | 1 | Frame index, PTS, duration, drop accounting |
+| `OcrText` | 2 | Recognized text, lines, words, confidence |
+| `UiAffordance` | 3 | Interactive UI elements and their bounds |
+| `SemanticGraph` | 4 | Entities and relations reconstructed across frames |
+| `InputEvent` | 5 | Input events correlated to frames |
+
+The format is independent of MP4 and can be embedded as a `mett` timed-metadata track or stored as a standalone `.mdkg` sidecar. See `apps/Yumlog.Native/hevc-swarm-out/MDKG-SPEC.md` for the full byte-layout specification.
+
+#### NPU Emulator Container app
+
+`apps\Yumlog.NpuEmulator` is the Rust/Tauri host for Yumlog's adaptive NPU-emulation runtime. It models the hard parts of Windows AI `systemAIModels`-style execution directly: feature readiness, model provisioning, container worker state, CPU-native emulated NPU execution targets, and trace capture for repeatable ground-truth analysis.
+
+```powershell
+cd apps\Yumlog.NpuEmulator
+npm install
+npm run tauri dev
+
+# Rust-only validation
+cd src-tauri
+cargo test
+cargo check
+```
+
+The first implementation exposes Tauri commands for `TextRecognizer`-style state, provisioning, model inventory, trace journal, container runtime probing, and recognition request acceptance. The next integration step is a local HTTP or named-pipe bridge so `Yumlog.Native.Cli` can call the emulator through a first-class `--ocr npu-emulator` mode.
+
+#### Native Agent Card desktop
+
+The packaged `Yumlog.Native.exe` shell is a dark local-first workspace with a
+persistent mode side pane and bottom tabs for:
+
+`Video`, `Screenshot`, `Audio`, `Transcript`, `Agents`, `Voices`, `Insights`,
+`Harvest`, and `Settings`.
+
+Every mode is backed by an Agent Card entry in
+`apps\Yumlog.Native\Assets\yumlog_agent_cards.json`. Video items use the full
+Paperboy adaptive flip-card contract with 4:3 shells at `220x165`, `360x270`,
+`720x540`, and `1080x810`. A `.agent-card.json` is emitted beside harvested
+videos with SHA-256 hashes, MDKG provenance, and front/back shell metadata.
+
+```powershell
+.\launchers\Build-YumlogProduction.ps1 -DotnetPath dotnet
+.\launchers\Install-YumlogProduction.ps1
+```
+
+The installer writes a versioned user-local application tree, Start Menu
+shortcuts, and the Native CLI path. Generated evidence remains under
+`Documents\Yumlog Native`; generated A2SWE project packages remain under
+`Documents\Yumlog Projects`.
 
 #### Using the Unified CLI
 
@@ -378,6 +499,26 @@ capture readiness and are not release gates.
 
 ### Command Reference
 
+#### Native CLI (`Yumlog.Native.Cli`)
+
+| Command | Description |
+|---|---|
+| `capture` | Fast screenshot sequence to a directory |
+| `record` | HEVC desktop video plus optional `.mdkg` metadata sidecar |
+| `analyze` | Image metadata, hashes, dimensions, OCR |
+| `follow` | Change-gated frame sequence plus follow manifest |
+| `orchestrate` | Run a multi-step plan file |
+| `runbook` | Emit a runbook whose every claim carries a resolvable citation |
+| `reason` | Answer a question about a recording with an on-device model |
+| `watch` | Observe the live screen and narrate on an interval |
+| `models` | List installed on-device models |
+| `selftest` | Run the 16-check built-in correctness suite |
+| `config show` / `config init` | Inspect or scaffold native config |
+
+Full flags in [`docs/NATIVE-CLI.md`](docs/NATIVE-CLI.md).
+
+#### PowerShell tooling
+
 | Command                | Description                                      |
 |------------------------|--------------------------------------------------|
 | `.\launchers\yumlog.ps1 start` | Record with optional `-Fps`, `-DurationSec`, and `-OutFile` |
@@ -412,17 +553,28 @@ darbot.yumlog/
 │   ├── Record-Terminals.ps1
 │   └── yumlog.ps1
 ├── apps/
+│   ├── Yumlog.Native/            # Packaged native desktop host and shared implementation
+│   │   ├── WgcCapture.fs         # Windows Graphics Capture
+│   │   ├── NvencHevc.fs          # NVENC HEVC encoder
+│   │   ├── X265Encoder.fs        # x265 software fallback
+│   │   ├── HevcMux.fs            # MP4/HEVC muxer
+│   │   ├── Mdkg.fs               # .mdkg layered metadata container
+│   │   ├── MdkgIntel.fs          # timeline, citations, runbooks
+│   │   ├── OnDeviceLlm.fs        # local model reasoning + watch
+│   │   ├── SelfTest.fs           # built-in correctness suite
+│   │   └── hevc-swarm-out/       # MDKG-SPEC.md, challenge reviews (see its README)
+├── hevc-swarm-out/               # CDP harnesses + recording artifacts (see its README)
+│   ├── Yumlog.Native.Cli/        # Runnable CLI entry point
+│   ├── Yumlog.NpuEmulator/       # Rust/Tauri NPU-emulation runtime
 │   ├── Paperboy.Desktop/
-│       ├── MainWindow.xaml
-│       └── Services/PaperboyBundleService.cs
 │   ├── Paperboy.Mcp/
-│   ├── Yumlog.Native/
 │   ├── Yumlog.APIM.Service/
 │   └── Yumlog.WidgetStudio/
+├── docs/
+│   ├── NATIVE-CLI.md
+│   ├── ON-DEVICE-REASONING.md
+│   │   └── NPU-EMULATOR-CONTAINER-SPEC.md
 ├── bisect-test/
-│   ├── bisect-extractor.html
-│   ├── library.html
-│   └── terminal-viewer.html
 ├── config/
 │   ├── tools.json
 │   └── yumlog.native.json

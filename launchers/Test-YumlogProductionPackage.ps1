@@ -1,0 +1,62 @@
+[CmdletBinding()]
+param(
+    [string]$PackagePath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist\Yumlog-0.5.0\package'),
+    [string]$InstallRoot = (Join-Path ([IO.Path]::GetTempPath()) ("yumlog-package-smoke-" + [Guid]::NewGuid().ToString('N')))
+)
+
+$ErrorActionPreference = 'Stop'
+$manifestPath = Join-Path $PackagePath 'release-manifest.json'
+$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+if ($manifest.version -ne '0.5.0') {
+    throw "Unexpected package version: $($manifest.version)"
+}
+
+foreach ($component in @($manifest.components)) {
+    $path = Join-Path $PackagePath $component.path
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "Missing release component: $($component.path)"
+    }
+    if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $component.sha256) {
+        throw "Apphost hash mismatch: $($component.path)"
+    }
+    if ($component.payloadFileCount -lt 1 -or [string]::IsNullOrWhiteSpace($component.payloadSha256)) {
+        throw "Missing payload digest: $($component.path)"
+    }
+}
+
+$nativeFfmpeg = Join-Path $PackagePath 'Yumlog.Native\.tools\ffmpeg\bin\ffmpeg.exe'
+if (-not (Test-Path -LiteralPath $nativeFfmpeg)) {
+    throw "Bundled FFmpeg is missing from Yumlog.Native."
+}
+& $nativeFfmpeg -version | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    throw "Bundled FFmpeg smoke test failed."
+}
+
+$cli = Join-Path $PackagePath 'Yumlog.Native.Cli\Yumlog.Native.Cli.exe'
+$selftest = & $cli selftest 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "Installed CLI self-test failed: $($selftest -join [Environment]::NewLine)"
+}
+
+& (Join-Path $PSScriptRoot 'Install-YumlogProduction.ps1') -PackagePath $PackagePath -Destination $InstallRoot -Force -NoUserIntegration | Out-Null
+$current = (Get-Content -LiteralPath (Join-Path $InstallRoot 'current.txt') -Raw).Trim()
+if (-not (Test-Path -LiteralPath (Join-Path $current 'Yumlog.Native\Yumlog.Native.exe'))) {
+    throw 'Installed native executable is missing.'
+}
+if (-not (Test-Path -LiteralPath (Join-Path $current 'Paperboy\Paperboy.exe'))) {
+    throw 'Installed Paperboy executable is missing.'
+}
+if (-not (Test-Path -LiteralPath (Join-Path $current 'config\yumlog.native.json'))) {
+    throw 'Installed native config is missing.'
+}
+
+[pscustomobject]@{
+    PackageVersion = $manifest.version
+    Components = @($manifest.components).Count
+    Ffmpeg = (Get-Item -LiteralPath $nativeFfmpeg).Length
+    SmokeInstall = $current
+    SelfTestPassed = $true
+}
+
+Remove-Item -LiteralPath $InstallRoot -Recurse -Force
