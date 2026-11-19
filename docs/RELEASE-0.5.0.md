@@ -8,6 +8,7 @@
 - Paperboy APIM UI connected to the real loopback service and an in-app A2SWE project generator.
 - Strict CLI option validation, `WarningsAsErrors`, fail-fast Pester coverage, and a warning-clean self-contained production publish.
 - Versioned production build/install launchers and Start Menu shortcuts.
+- Standard MCP stdio/NDJSON, streamable HTTP, stateless MCP, legacy SSE, and Agent Plugin 1.0 with a read-only Foundry tagging endpoint.
 
 ## Production build
 

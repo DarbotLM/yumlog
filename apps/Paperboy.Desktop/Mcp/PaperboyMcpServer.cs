@@ -17,7 +17,10 @@ public static class PaperboyMcpServer
     private static readonly string[] SupportedMcpMethods =
     [
         "initialize",
+        "ping",
         "notifications/initialized",
+        "notifications/cancelled",
+        "notifications/progress",
         "tools/list",
         "tools/call",
         "resources/list",
@@ -75,10 +78,21 @@ public static class PaperboyMcpServer
 
     private static readonly PaperboyCapabilityRegistry Capabilities = PaperboyCapabilityRegistry.Shared;
     private static readonly PaperboyCapabilityInvoker CapabilityInvoker = new();
+    private static readonly HashSet<string> ReadOnlyHttpTools = new(StringComparer.Ordinal)
+    {
+        "paperboy.bundle.inspect",
+        "paperboy.foundryLocal.analyze",
+        "paperboy.foundryLocal.modelCards",
+        "paperboy.cards.list",
+        "paperboy.cards.schema",
+        "paperboy.cards.videoSchema",
+        "paperboy.capabilities.list",
+        "paperboy.extensions.list",
+        "paperboy.extensions.describe"
+    };
 
     public static async Task RunAsync(Stream input, Stream output, string[] args, CancellationToken cancellationToken = default)
     {
-        using var reader = new StreamReader(input, Encoding.UTF8, leaveOpen: true);
         await using var writer = new StreamWriter(output, new UTF8Encoding(false), leaveOpen: true)
         {
             AutoFlush = true,
@@ -91,24 +105,55 @@ public static class PaperboyMcpServer
         var cards = AgentCardCatalog.Default;
 
         Log("Paperboy MCP server started.");
+        var framing = args.Any(arg => string.Equals(arg, "--ndjson", StringComparison.OrdinalIgnoreCase))
+            ? MessageFraming.Ndjson
+            : args.Any(arg => string.Equals(arg, "--content-length", StringComparison.OrdinalIgnoreCase))
+                ? MessageFraming.ContentLength
+                : MessageFraming.Auto;
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var request = await ReadMessageAsync(reader, cancellationToken);
-            if (request is null)
+            var message = await ReadMessageAsync(input, cancellationToken);
+            if (message is null)
             {
                 break;
             }
 
-            var response = await HandleRequestAsync(request, service, foundry, pmm, cards, cancellationToken);
+            if (framing == MessageFraming.Auto)
+            {
+                framing = message.Value.Framing;
+            }
+
+            var response = await HandleRequestAsync(message.Value.Message, service, foundry, pmm, cards, cancellationToken);
             if (response is not null)
             {
-                await WriteMessageAsync(writer, response, cancellationToken);
+                await WriteMessageAsync(writer, response, framing, cancellationToken);
             }
         }
     }
 
-    private static async Task<JsonObject?> HandleRequestAsync(JsonObject request, PaperboyBundleService service, FoundryLocalPipelineService foundry, PaperboyModelManagerService pmm, AgentCardCatalog cards, CancellationToken cancellationToken)
+    /// <summary>Handles one unframed JSON-RPC request using the common Paperboy services.</summary>
+    public static Task<JsonObject?> HandleJsonRpcAsync(
+        JsonObject request,
+        CancellationToken cancellationToken = default,
+        bool readOnlyHttp = true) =>
+        HandleRequestAsync(
+            request,
+            new PaperboyBundleService(),
+            new FoundryLocalPipelineService(),
+            new PaperboyModelManagerService(),
+            AgentCardCatalog.Default,
+            cancellationToken,
+            readOnlyHttp);
+
+    private static async Task<JsonObject?> HandleRequestAsync(
+        JsonObject request,
+        PaperboyBundleService service,
+        FoundryLocalPipelineService foundry,
+        PaperboyModelManagerService pmm,
+        AgentCardCatalog cards,
+        CancellationToken cancellationToken,
+        bool readOnlyHttp = false)
     {
         var id = request["id"]?.DeepClone();
         var method = request["method"]?.GetValue<string>() ?? "";
@@ -118,9 +163,10 @@ public static class PaperboyMcpServer
         {
             return method switch
             {
+                "ping" => id is null ? null : Response(id, new JsonObject()),
                 "initialize" => Response(id, new JsonObject
                 {
-                    ["protocolVersion"] = "2024-11-05",
+                    ["protocolVersion"] = NegotiatedProtocolVersion(request),
                     ["serverInfo"] = new JsonObject
                     {
                         ["name"] = "paperboy",
@@ -148,9 +194,11 @@ public static class PaperboyMcpServer
                     }
                 }),
                 "notifications/initialized" => null,
+                "notifications/cancelled" => null,
+                "notifications/progress" => null,
                 "tools/list" => Response(id, new JsonObject
                 {
-                    ["tools"] = ToolList()
+                    ["tools"] = ToolList(readOnlyHttp)
                 }),
                 "resources/list" => Response(id, new JsonObject
                 {
@@ -162,8 +210,8 @@ public static class PaperboyMcpServer
                     ["prompts"] = PromptList()
                 }),
                 "prompts/get" => HandlePromptGet(id, request["params"]?.AsObject()),
-                "tools/call" => await HandleToolCallAsync(id, request["params"]?.AsObject(), service, foundry, pmm, cards, cancellationToken),
-                _ => Error(id, -32601, $"Unsupported method: {method}")
+                "tools/call" => await HandleMcpToolCallAsync(id, request["params"]?.AsObject(), service, foundry, pmm, cards, cancellationToken, readOnlyHttp),
+                _ => id is null ? null : Error(id, -32601, $"Unsupported method: {method}")
             };
         }
         catch (ArgumentException ex)
@@ -181,10 +229,28 @@ public static class PaperboyMcpServer
         }
     }
 
-    private static async Task<JsonObject> HandleToolCallAsync(JsonNode? id, JsonObject? parameters, PaperboyBundleService service, FoundryLocalPipelineService foundry, PaperboyModelManagerService pmm, AgentCardCatalog cards, CancellationToken cancellationToken)
+    private static async Task<JsonObject> HandleToolCallAsync(
+        JsonNode? id,
+        JsonObject? parameters,
+        PaperboyBundleService service,
+        FoundryLocalPipelineService foundry,
+        PaperboyModelManagerService pmm,
+        AgentCardCatalog cards,
+        CancellationToken cancellationToken,
+        bool readOnlyHttp)
     {
         var name = parameters?["name"]?.GetValue<string>() ?? "";
         var args = parameters?["arguments"]?.AsObject() ?? new JsonObject();
+        if (readOnlyHttp && !ReadOnlyHttpTools.Contains(name))
+        {
+            return Error(id, -32602, $"Tool '{name}' is not exposed through the read-only HTTP transport.");
+        }
+
+        if (readOnlyHttp && string.Equals(name, "paperboy.foundryLocal.analyze", StringComparison.Ordinal))
+        {
+            args.Remove("outputDirectory");
+            ValidateReadOnlyTagArguments(args);
+        }
 
         return name switch
         {
@@ -208,6 +274,38 @@ public static class PaperboyMcpServer
             "paperboy.extensions.invoke" => ContentResponse(id, await ExtensionInvokeAsync(args, cancellationToken)),
             _ => Error(id, -32602, $"Unknown tool: {name}")
         };
+    }
+
+    private static async Task<JsonObject> HandleMcpToolCallAsync(
+        JsonNode? id,
+        JsonObject? parameters,
+        PaperboyBundleService service,
+        FoundryLocalPipelineService foundry,
+        PaperboyModelManagerService pmm,
+        AgentCardCatalog cards,
+        CancellationToken cancellationToken,
+        bool readOnlyHttp)
+    {
+        try
+        {
+            return await HandleToolCallAsync(
+                id,
+                parameters,
+                service,
+                foundry,
+                pmm,
+                cards,
+                cancellationToken,
+                readOnlyHttp);
+        }
+        catch (ArgumentException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return ToolErrorResponse(id, ex.Message);
+        }
     }
 
     private static string CardsJson(JsonObject args, AgentCardCatalog cards)
@@ -427,6 +525,54 @@ public static class PaperboyMcpServer
         return Path.GetFullPath(path);
     }
 
+    private static void ValidateReadOnlyTagArguments(JsonObject args)
+    {
+        var endpointText = args["endpoint"]?.GetValue<string>() ?? "http://127.0.0.1:52495/v1";
+        if (!Uri.TryCreate(endpointText, UriKind.Absolute, out var endpoint)
+            || !endpoint.IsLoopback
+            || !string.Equals(endpoint.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("HTTP tagging requires a loopback HTTP Foundry endpoint.");
+        }
+
+        var roots = new List<string>
+        {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Yumlog Native"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Yumlog Projects"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DarbotLabs", "Yumlog", "Studio")
+        };
+        var configured = Environment.GetEnvironmentVariable("YUMLOG_AGENT_ALLOWED_ROOTS");
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            roots.AddRange(configured.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        }
+
+        var normalizedRoots = roots
+            .Select(Path.GetFullPath)
+            .Select(Path.TrimEndingDirectorySeparator)
+            .ToArray();
+        var paths = args["sourcePaths"]?.AsArray()
+            .Select(node => node?.GetValue<string>())
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => Path.GetFullPath(path!))
+            .ToArray() ?? [];
+        if (paths.Length == 0)
+        {
+            throw new ArgumentException("sourcePaths is required.");
+        }
+
+        foreach (var path in paths)
+        {
+            var allowed = normalizedRoots.Any(root =>
+                path.Equals(root, StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
+            if (!allowed)
+            {
+                throw new ArgumentException($"Path is outside an allowed Yumlog agent root: {path}");
+            }
+        }
+    }
+
     private static CompressionLevel ParseCompression(string value) => value switch
     {
         "Fastest" => CompressionLevel.Fastest,
@@ -448,8 +594,10 @@ public static class PaperboyMcpServer
         }
     };
 
-    private static JsonArray ToolList() => new()
+    private static JsonArray ToolList(bool readOnlyHttp = false)
     {
+        var tools = new JsonArray
+        {
         Tool(
             "paperboy.bundle.pack",
             "Pack files/folders into a manifest-backed .paperboy.zip bundle. Required: sourcePaths, outputPath. Optional: compressionLevel, includeHidden, overwrite, tossTo.",
@@ -532,7 +680,30 @@ public static class PaperboyMcpServer
             ["arguments"] = ObjectSchema("Values substituted into {{token}} placeholders and sent as the HTTP JSON body."),
             ["timeoutSeconds"] = IntegerSchema("Override the capability timeout, 1-900 seconds.")
         })
-    };
+        };
+
+        if (!readOnlyHttp)
+        {
+            return tools;
+        }
+
+        var readOnly = tools
+            .OfType<JsonObject>()
+            .Where(tool => ReadOnlyHttpTools.Contains(tool["name"]?.GetValue<string>() ?? ""))
+            .Select(tool => tool.DeepClone().AsObject())
+            .ToArray();
+        foreach (var tool in readOnly)
+        {
+            if (tool["name"]?.GetValue<string>() == "paperboy.foundryLocal.analyze"
+                && tool["inputSchema"]?["properties"] is JsonObject properties)
+            {
+                properties.Remove("outputDirectory");
+                tool["description"] = "Analyze allowlisted local media/documents with Foundry Local and return tags/classifications without writing sidecar files.";
+            }
+        }
+
+        return new JsonArray(readOnly.Select(tool => (JsonNode)tool).ToArray());
+    }
 
     /// <summary>Paperboy's own MCP tools, projected for the capability registry.</summary>
     public static IReadOnlyList<PaperboyBuiltInTool> BuiltInToolDescriptors() =>
@@ -875,6 +1046,19 @@ public static class PaperboyMcpServer
         }
     });
 
+    private static JsonObject ToolErrorResponse(JsonNode? id, string message) => Response(id, new JsonObject
+    {
+        ["content"] = new JsonArray
+        {
+            new JsonObject
+            {
+                ["type"] = "text",
+                ["text"] = message
+            }
+        },
+        ["isError"] = true
+    });
+
     private static JsonObject Response(JsonNode? id, JsonObject result) => new()
     {
         ["jsonrpc"] = "2.0",
@@ -893,9 +1077,20 @@ public static class PaperboyMcpServer
         }
     };
 
-    private static async Task<JsonObject?> ReadMessageAsync(StreamReader reader, CancellationToken cancellationToken)
+    private enum MessageFraming
     {
-        var line = await reader.ReadLineAsync(cancellationToken);
+        Auto,
+        ContentLength,
+        Ndjson
+    }
+
+    private readonly record struct StdioMessage(JsonObject Message, MessageFraming Framing);
+
+    private static async Task<StdioMessage?> ReadMessageAsync(
+        Stream stream,
+        CancellationToken cancellationToken)
+    {
+        var line = await ReadAsciiLineAsync(stream, cancellationToken);
         if (line is null)
         {
             return null;
@@ -903,16 +1098,22 @@ public static class PaperboyMcpServer
 
         if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase))
         {
-            var length = int.Parse(line["Content-Length:".Length..].Trim());
-            while (!string.IsNullOrEmpty(await reader.ReadLineAsync(cancellationToken)))
+            if (!int.TryParse(line["Content-Length:".Length..].Trim(), out var length)
+                || length <= 0
+                || length > MaxContentLength)
+            {
+                throw new InvalidOperationException($"Invalid Content-Length. Maximum is {MaxContentLength} bytes.");
+            }
+
+            while (!string.IsNullOrEmpty(await ReadAsciiLineAsync(stream, cancellationToken)))
             {
             }
 
-            var buffer = new char[length];
+            var buffer = new byte[length];
             var read = 0;
             while (read < length)
             {
-                var count = await reader.ReadAsync(buffer.AsMemory(read, length - read), cancellationToken);
+                var count = await stream.ReadAsync(buffer.AsMemory(read, length - read), cancellationToken);
                 if (count == 0)
                 {
                     break;
@@ -925,15 +1126,54 @@ public static class PaperboyMcpServer
                 throw new InvalidOperationException($"Expected {length} message bytes but read {read}.");
             }
 
-            return JsonNode.Parse(new string(buffer, 0, read))?.AsObject();
+            var framed = JsonNode.Parse(buffer)?.AsObject()
+                ?? throw new InvalidOperationException("MCP message must be a JSON object.");
+            return new StdioMessage(framed, MessageFraming.ContentLength);
         }
 
         if (string.IsNullOrWhiteSpace(line))
         {
-            return null;
+            return await ReadMessageAsync(stream, cancellationToken);
         }
 
-        throw new InvalidOperationException("MCP stdio messages must include a Content-Length header.");
+        var json = JsonNode.Parse(line)?.AsObject()
+            ?? throw new InvalidOperationException("MCP NDJSON message must be a JSON object.");
+        return new StdioMessage(json, MessageFraming.Ndjson);
+    }
+
+    private static async Task<string?> ReadAsciiLineAsync(
+        Stream stream,
+        CancellationToken cancellationToken)
+    {
+        using var buffer = new MemoryStream();
+        var previous = -1;
+        while (buffer.Length <= MaxContentLength)
+        {
+            var byteValue = new byte[1];
+            var read = await stream.ReadAsync(byteValue, cancellationToken);
+            if (read == 0)
+            {
+                return buffer.Length == 0 ? null : Encoding.UTF8.GetString(buffer.ToArray());
+            }
+
+            var current = byteValue[0];
+            buffer.WriteByte(current);
+            if (previous == '\r' && current == '\n')
+            {
+                var bytes = buffer.ToArray();
+                return Encoding.UTF8.GetString(bytes, 0, Math.Max(0, bytes.Length - 2));
+            }
+
+            if (current == '\n')
+            {
+                var bytes = buffer.ToArray();
+                return Encoding.UTF8.GetString(bytes, 0, Math.Max(0, bytes.Length - 1));
+            }
+
+            previous = current;
+        }
+
+        throw new InvalidOperationException($"MCP input line exceeds the {MaxContentLength} byte limit.");
     }
 
     private static async Task EnsureFoundryEndpointHealthyAsync(Uri endpoint, CancellationToken cancellationToken)
@@ -958,6 +1198,16 @@ public static class PaperboyMcpServer
         }
     }
 
+    private static string NegotiatedProtocolVersion(JsonObject request)
+    {
+        var requested = request["params"]?["protocolVersion"]?.GetValue<string>();
+        return requested switch
+        {
+            "2025-06-18" or "2025-03-26" or "2024-11-05" => requested,
+            _ => "2024-11-05"
+        };
+    }
+
     private static string ServerVersion()
     {
         var version = typeof(PaperboyMcpServer).Assembly.GetName().Version;
@@ -972,12 +1222,25 @@ public static class PaperboyMcpServer
         }
     }
 
-    private static async Task WriteMessageAsync(StreamWriter writer, JsonObject response, CancellationToken cancellationToken)
+    private static async Task WriteMessageAsync(
+        StreamWriter writer,
+        JsonObject response,
+        MessageFraming framing,
+        CancellationToken cancellationToken)
     {
         var json = response.ToJsonString(JsonOptions);
-        var byteLength = Encoding.UTF8.GetByteCount(json);
-        await writer.WriteAsync($"Content-Length: {byteLength}\r\n\r\n");
+        if (framing == MessageFraming.ContentLength)
+        {
+            var byteLength = Encoding.UTF8.GetByteCount(json);
+            await writer.WriteAsync($"Content-Length: {byteLength}\r\n\r\n");
+        }
+
         await writer.WriteAsync(json.AsMemory(), cancellationToken);
+        if (framing == MessageFraming.Ndjson)
+        {
+            await writer.WriteAsync("\n");
+        }
+
         await writer.FlushAsync(cancellationToken);
     }
 

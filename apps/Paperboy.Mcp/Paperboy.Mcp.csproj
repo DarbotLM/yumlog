@@ -16,6 +16,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Include="..\Paperboy.Desktop\Services\PaperboyBundleService.cs" Link="Services\PaperboyBundleService.cs" />
     <Compile Include="..\Paperboy.Desktop\Services\FoundryLocalPipelineService.cs" Link="Services\FoundryLocalPipelineService.cs" />
     <Compile Include="..\Paperboy.Desktop\Services\PaperboyModelManagerService.cs" Link="Services\PaperboyModelManagerService.cs" />

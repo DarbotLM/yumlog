@@ -61,6 +61,8 @@ jobs:
         run: |
           .\launchers\Build-YumlogProduction.ps1 -DotnetPath dotnet
           .\launchers\Test-YumlogProductionPackage.ps1
+      - name: Agent client protocol contracts
+        run: .\launchers\Test-YumlogAgentProtocol.ps1 -DotnetPath dotnet
       - name: Native CLI self-test
         run: dotnet run --no-build --project .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release -- selftest
       - name: Set up Rust

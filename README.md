@@ -140,6 +140,40 @@ component payload digests.
 The installer creates versioned user-local binaries and Start Menu shortcuts.
 It does not modify system-wide certificate or service state.
 
+#### Agent client protocol and Agent Plugin 1.0
+
+Paperboy exposes the same MCP tools over standard stdio NDJSON (with legacy
+`Content-Length` compatibility) and a loopback HTTP host:
+
+```powershell
+.\apps\Paperboy.Mcp\bin\Release\net11.0-windows\Paperboy.Mcp.exe --http `
+  --url http://127.0.0.1:5117
+```
+
+The installed Paperboy UI can start and stop this host from **APIM Surface**.
+It publishes:
+
+| Surface | URL |
+|---|---|
+| Stateless / streamable MCP | `http://127.0.0.1:5117/mcp` |
+| Legacy MCP SSE | `http://127.0.0.1:5117/sse` |
+| Legacy POST endpoint | `http://127.0.0.1:5117/message?sessionId=...` |
+| Agent Plugin 1.0 | `http://127.0.0.1:5117/.well-known/ai-plugin.json` |
+| OpenAPI | `http://127.0.0.1:5117/openapi.json` |
+| Read-only tagging pipeline | `http://127.0.0.1:5117/api/tag` |
+
+The HTTP catalog is intentionally read-only: it exposes cards, discovery,
+bundle inspection, and Foundry analysis, but not model downloads, model
+mutation, bundle writes, or arbitrary extension execution. Tag requests accept
+only paths under Yumlog/Studio storage or roots listed in
+`YUMLOG_AGENT_ALLOWED_ROOTS`, and only a loopback HTTP Foundry endpoint.
+
+The installed app connects selected payload paths by passing its allowed roots
+to the child host. The current pipeline computes hashes and Foundry tags,
+classifications, and summaries. Image bytes are supported; video uses one
+sampled frame. Audio, speech transcription, and document-body grounding remain
+explicit capability/model requirements rather than silently inferred output.
+
 #### Using the native F# CLI
 
 The runnable binary is built from `apps\Yumlog.Native.Cli`. The `apps\Yumlog.Native` project is the implementation library.

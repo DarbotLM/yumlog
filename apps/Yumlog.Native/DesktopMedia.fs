@@ -148,10 +148,11 @@ module DesktopMedia =
     let transcribe executable (whisper: string) (model: string) input (output: string) =
         if String.IsNullOrWhiteSpace(whisper) || not (File.Exists(model)) then
             invalidOp "Set the whisper.cpp executable and a local model in Settings."
-        let pcm = Path.ChangeExtension(output, ".wav")
+        let pcm = Path.ChangeExtension(output, ".wav") |> orEmptyIfNull
+        let transcriptBase = Path.ChangeExtension(output, null) |> orEmptyIfNull
         try
             ffmpeg executable "error" [ "-i"; input; "-map"; "0:a:0"; "-ar"; "16000"; "-ac"; "1"; "-c:a"; "pcm_s16le"; pcm ] |> ignore
-            run 1800000 whisper [ "-m"; model; "-f"; pcm; "-osrt"; "-of"; Path.ChangeExtension(output, null) ] |> ignore
+            run 1800000 whisper [ "-m"; model; "-f"; pcm; "-osrt"; "-of"; transcriptBase ] |> ignore
             if not (File.Exists(output)) then invalidOp "Whisper did not produce a transcript."
         finally
             File.Delete(pcm)

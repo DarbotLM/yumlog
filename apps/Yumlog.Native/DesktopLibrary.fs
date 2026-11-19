@@ -86,8 +86,8 @@ module DesktopLibrary =
 
     let private plain kind path = artifact kind path (Nullable()) (Nullable())
 
-    let private fileName (path: string) = Path.GetFileName(path)
-    let private title (path: string) = Path.GetFileNameWithoutExtension(path)
+    let private fileName (path: string) = Path.GetFileName(path) |> orEmptyIfNull
+    let private title (path: string) = Path.GetFileNameWithoutExtension(path) |> orEmptyIfNull
 
     let private descriptor (item: Artifact) =
         {| id = item.Id; kind = item.Kind; name = fileName item.Path; start = item.Start; duration = item.Duration
@@ -95,7 +95,7 @@ module DesktopLibrary =
 
     let private metadataPath (video: Video) =
         [ yield! video.Artifacts |> Array.filter (fun a -> a.Kind = "timedMetadata") |> Array.map (fun a -> a.Path)
-          yield Path.ChangeExtension(video.Path, ".mdkg") ]
+          yield Path.ChangeExtension(video.Path, ".mdkg") |> orEmptyIfNull ]
         |> List.tryFind File.Exists
 
     let private artifacts (video: Video) =
@@ -344,7 +344,7 @@ module DesktopLibrary =
                     let isFfmpeg = config.Backend = "ffmpeg"
                     let format = if isFfmpeg then "mp4" else config.Container
                     let output = Path.Combine(directory, "Desktop-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + "." + format)
-                    let mdkg = Path.ChangeExtension(output, ".mdkg")
+                    let mdkg = Path.ChangeExtension(output, ".mdkg") |> orEmptyIfNull
                     NativeRecording.record
                         { config with OutFile = output; Container = format; DurationSec = duration
                                       TimedMetadataOut = if isFfmpeg then "" else mdkg }

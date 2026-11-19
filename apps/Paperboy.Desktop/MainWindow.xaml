@@ -601,6 +601,26 @@
                                     Click="CheckApimEndpoint_Click"
                                     Background="#DCFCE7"
                                     Foreground="#14532D" />
+                            <TextBlock Text="Agent client protocol" FontWeight="SemiBold" Margin="0,12,0,4" />
+                            <TextBox x:Name="AgentProtocolEndpointText"
+                                     Text="http://127.0.0.1:5117"
+                                     Margin="0,0,0,8" />
+                            <WrapPanel Margin="0,0,0,8">
+                                <Button Content="Start agent transports"
+                                        Click="StartAgentTransports_Click"
+                                        Background="#7C3AED"
+                                        Foreground="White" />
+                                <Button Content="Stop agent transports"
+                                        Click="StopAgentTransports_Click" />
+                                <Button Content="Copy plugin URL"
+                                        Click="CopyAgentPluginUrl_Click"
+                                        Background="#EDE9FE"
+                                        Foreground="#6D28D9" />
+                                <Button Content="Tag selected payload"
+                                        Click="TagSelectedPayload_Click"
+                                        Background="#DBEAFE"
+                                        Foreground="#1E3A8A" />
+                            </WrapPanel>
                             <TextBlock Text="Service controls" FontWeight="SemiBold" Margin="0,12,0,4" />
                             <WrapPanel Margin="0,0,0,8">
                                 <Button Content="Start service"
@@ -651,6 +671,16 @@
                                     <TextBlock Text="MCP bridge" Foreground="{StaticResource PaperboyMuted}" />
                                     <TextBlock x:Name="ApimMcpBridgeStatusText"
                                                Text="MCP bridge not checked."
+                                               FontSize="16"
+                                               FontWeight="Bold"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                            <Border CornerRadius="14" Padding="12" Background="#EEF2FF" Margin="0,0,0,10">
+                                <StackPanel>
+                                    <TextBlock Text="Agent transports" Foreground="{StaticResource PaperboyMuted}" />
+                                    <TextBlock x:Name="AgentProtocolStatusText"
+                                               Text="MCP stdio is available. Streamable HTTP, SSE, stateless, and Agent Plugin 1.0 are not started."
                                                FontSize="16"
                                                FontWeight="Bold"
                                                TextWrapping="Wrap" />

@@ -1,5 +1,6 @@
 using Paperboy.Desktop.Mcp;
 
+var http = args.Any(arg => string.Equals(arg, "--http", StringComparison.OrdinalIgnoreCase));
 var verbose = args.Any(arg => string.Equals(arg, "--verbose", StringComparison.OrdinalIgnoreCase));
 using var cancellation = new CancellationTokenSource();
 
@@ -11,6 +12,12 @@ Console.CancelKeyPress += (_, eventArgs) =>
 
 try
 {
+    if (http)
+    {
+        await PaperboyMcpHttpHost.RunAsync(args, cancellation.Token);
+        return 0;
+    }
+
     Log(verbose, "Starting Paperboy MCP server.");
     await PaperboyMcpServer.RunAsync(
         Console.OpenStandardInput(),

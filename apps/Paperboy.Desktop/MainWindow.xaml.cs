@@ -7,6 +7,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -33,6 +34,7 @@ public partial class MainWindow : Window
     private readonly PaperboyModelManagerService _modelManager = new();
     private readonly PaperboyCapabilityRegistry _capabilityRegistry = PaperboyCapabilityRegistry.Shared;
     private string? _lastFoundrySidecarPath;
+    private Process? _agentTransportProcess;
     private static readonly HttpClient ApimHealthClient = new()
     {
         Timeout = TimeSpan.FromSeconds(3)
@@ -75,6 +77,32 @@ public partial class MainWindow : Window
         UpdatePayloadSummary();
         RefreshApimSurfaceStatus();
         RefreshExtensionStatus(rescan: false);
+        Closed += (_, _) => StopAgentTransportProcess();
+    }
+
+    private void StopAgentTransportProcess()
+    {
+        if (_agentTransportProcess is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!_agentTransportProcess.HasExited)
+            {
+                _agentTransportProcess.Kill(entireProcessTree: true);
+                _agentTransportProcess.WaitForExit(5000);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        finally
+        {
+            _agentTransportProcess.Dispose();
+            _agentTransportProcess = null;
+        }
     }
 
     private void AddFiles_Click(object sender, RoutedEventArgs e)
@@ -703,6 +731,145 @@ public partial class MainWindow : Window
     private async void StartApimService_Click(object sender, RoutedEventArgs e)
     {
         await RunApimServiceScriptAsync("Start", "Start-YumlogAPIMService.ps1");
+    }
+
+    private async void StartAgentTransports_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_agentTransportProcess is { HasExited: false })
+            {
+                AgentProtocolStatusText.Text = "Agent transports are already running.";
+                return;
+            }
+
+            var mcpCandidates = new[]
+            {
+                ResolveSiblingPath("Paperboy.Mcp", "Paperboy.Mcp.exe"),
+                ResolveSiblingPath("Paperboy.Mcp", "bin", "Release", "net11.0-windows", "Paperboy.Mcp.exe"),
+                ResolveSiblingPath("Paperboy.Mcp", "bin", "Debug", "net11.0-windows", "Paperboy.Mcp.exe"),
+                System.IO.Path.Combine(AppContext.BaseDirectory, "Paperboy.Mcp.exe")
+            };
+            var mcpExe = mcpCandidates.FirstOrDefault(File.Exists);
+            if (string.IsNullOrWhiteSpace(mcpExe))
+            {
+                throw new FileNotFoundException("Paperboy.Mcp executable was not found.");
+            }
+
+            var endpoint = AgentProtocolEndpointText.Text.Trim();
+            var startInfo = new ProcessStartInfo(mcpExe)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = System.IO.Path.GetDirectoryName(mcpExe) ?? AppContext.BaseDirectory
+            };
+            startInfo.ArgumentList.Add("--http");
+            startInfo.ArgumentList.Add("--url");
+            startInfo.ArgumentList.Add(endpoint);
+            var allowedRoots = Sources
+                .Select(source => Directory.Exists(source.Path) ? source.Path : System.IO.Path.GetDirectoryName(source.Path))
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Select(path => System.IO.Path.GetFullPath(path!))
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+            startInfo.Environment["YUMLOG_AGENT_ALLOWED_ROOTS"] = string.Join(';', allowedRoots);
+            _agentTransportProcess = Process.Start(startInfo)
+                ?? throw new InvalidOperationException("Failed to start Paperboy agent transports.");
+
+            for (var attempt = 0; attempt < 20; attempt++)
+            {
+                await Task.Delay(250);
+                if (_agentTransportProcess.HasExited)
+                {
+                    throw new InvalidOperationException($"Agent transport host exited with code {_agentTransportProcess.ExitCode}.");
+                }
+
+                try
+                {
+                    using var response = await ApimHealthClient.GetAsync($"{endpoint.TrimEnd('/')}/health");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        AgentProtocolStatusText.Text =
+                            $"Healthy at {endpoint}: streamable HTTP, SSE, stateless MCP, and Agent Plugin 1.0.";
+                        SetStatus("Agent client transports are ready.");
+                        AppendLog(AgentProtocolStatusText.Text);
+                        return;
+                    }
+                }
+                catch (HttpRequestException)
+                {
+                }
+            }
+
+            throw new TimeoutException($"Agent transport health did not become ready at {endpoint}.");
+        }
+        catch (Exception ex)
+        {
+            AgentProtocolStatusText.Text = ex.Message;
+            SetStatus(ex.Message, isError: true);
+            AppendLog($"ERROR: {ex}");
+        }
+    }
+
+    private void StopAgentTransports_Click(object sender, RoutedEventArgs e)
+    {
+        if (_agentTransportProcess is not { HasExited: false })
+        {
+            AgentProtocolStatusText.Text = "Agent transports are not running.";
+            return;
+        }
+
+        StopAgentTransportProcess();
+        AgentProtocolStatusText.Text = "Agent transports stopped.";
+        SetStatus(AgentProtocolStatusText.Text);
+    }
+
+    private void CopyAgentPluginUrl_Click(object sender, RoutedEventArgs e)
+    {
+        var url = $"{AgentProtocolEndpointText.Text.TrimEnd('/')}/.well-known/ai-plugin.json";
+        Clipboard.SetText(url);
+        AgentProtocolStatusText.Text = $"Copied Agent Plugin 1.0 URL: {url}";
+        SetStatus("Copied Agent Plugin URL.");
+        AppendLog(url);
+    }
+
+    private async void TagSelectedPayload_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (Sources.Count == 0)
+            {
+                throw new InvalidOperationException("Add files or folders to the payload before invoking agent tagging.");
+            }
+
+            var payload = new
+            {
+                sourcePaths = Sources.Select(source => source.Path).ToArray(),
+                model = FoundryModelText.Text.Trim(),
+                endpoint = FoundryEndpointText.Text.Trim(),
+                includeImageContent = FoundryIncludeImagesCheck.IsChecked == true,
+                sampleVideoFrames = FoundrySampleVideoCheck.IsChecked == true,
+                maxImageBytes = 2_000_000
+            };
+            var url = $"{AgentProtocolEndpointText.Text.TrimEnd('/')}/api/tag";
+            using var response = await ApimHealthClient.PostAsync(
+                url,
+                JsonContent.Create(payload));
+            var body = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException($"Agent tagging failed with HTTP {(int)response.StatusCode}: {body}");
+            }
+
+            AgentProtocolStatusText.Text = "Agent Plugin tagging completed.";
+            AppendLog($"Agent tagging result: {body}");
+            SetStatus("Selected payload tagged through the agent protocol.");
+        }
+        catch (Exception ex)
+        {
+            AgentProtocolStatusText.Text = ex.Message;
+            SetStatus(ex.Message, isError: true);
+            AppendLog($"ERROR: {ex}");
+        }
     }
 
     private async void StopApimService_Click(object sender, RoutedEventArgs e)
