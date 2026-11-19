@@ -57,7 +57,7 @@ module NativeRecording =
         | "libaom-av1" | "libsvtav1" | "av1_nvenc" | "av1_qsv" | "av1" -> "av1"
         | other -> other
 
-    let private resolveFfmpeg config =
+    let internal resolveFfmpeg config =
         candidatePaths config
         |> List.tryFind (fun candidate -> candidate <> "ffmpeg" && File.Exists(candidate))
         |> Option.defaultWith (fun () ->

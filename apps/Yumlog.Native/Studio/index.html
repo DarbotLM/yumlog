@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https://yumlog-media.local; media-src https://yumlog-media.local; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Yumlog Studio</title>
+  <link rel="stylesheet" href="studio.css">
+  <script src="studio.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <button type="button" class="icon-button library-toggle" id="library-toggle" aria-controls="library" aria-expanded="false" aria-label="Toggle library">☰</button>
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span>Yumlog <small>Studio</small></span></div>
+    <div class="header-actions">
+      <button type="button" id="record" class="button"><span class="record-dot" aria-hidden="true"></span>Record</button>
+      <button type="button" id="import" class="button primary"><span aria-hidden="true">+</span> Open video</button>
+    </div>
+  </header>
+  <div class="app-body">
+    <aside id="library" class="library" aria-label="Recording library">
+      <div class="library-head">
+        <h2>Recordings</h2><span id="library-count" class="count"></span>
+      </div>
+      <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Find a recording" aria-label="Find a recording"></label>
+      <div id="recordings" class="recordings"></div>
+      <button type="button" id="output-folder" class="button folder-button">Open output folder <span aria-hidden="true">↗</span></button>
+    </aside>
+    <main id="workspace">
+      <header class="workspace-header">
+        <div class="workspace-heading">
+          <h1 id="workspace-title">Capture workspace</h1>
+          <p id="workspace-meta">Local recording library</p>
+        </div>
+        <label class="size-control">Card size
+          <select id="card-size">
+            <option value="compact">Compact</option>
+            <option value="studio" selected>Studio</option>
+            <option value="wide">Wide</option>
+          </select>
+        </label>
+      </header>
+      <article id="card" class="agent-card" data-size="studio" data-flipped="false" aria-label="Recording AgentCard">
+        <header class="card-header">
+          <div class="card-identity"><span class="card-glyph" aria-hidden="true">◈</span><h2 id="card-title">Video</h2></div>
+          <button type="button" id="flip" class="button flip-button" aria-controls="paperboy-face" aria-expanded="false" disabled><span aria-hidden="true">⇄</span> Paperboy</button>
+        </header>
+        <div id="card-panel" class="card-body" role="tabpanel">
+          <div class="faces">
+            <div class="rotator">
+              <section id="tool-face" class="face tool-face" aria-label="Tool preview"></section>
+              <section id="paperboy-face" class="face paperboy-face" aria-label="Paperboy card" inert></section>
+            </div>
+          </div>
+          <aside id="tools" class="sidepane" aria-label="Tool controls"></aside>
+        </div>
+        <nav id="tabs" class="tabs" role="tablist" aria-label="Recording tools"></nav>
+      </article>
+      <footer class="workspace-footer">
+        <p id="status" role="status">Opening studio…</p>
+        <span class="local"><i></i>Local workspace</span>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

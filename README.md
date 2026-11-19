@@ -107,6 +107,24 @@ contract and explicit OCR side effects.
 read-only `{ready,code,message}` probe; existing `analyze`/`follow` behavior is
 unchanged and may provision when explicitly invoked with OCR.
 
+#### Using Yumlog Studio
+
+Launch the native desktop UI on Windows with the .NET 10 SDK and Microsoft Edge
+WebView2 Runtime.
+
+```powershell
+dotnet run --project .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release
+```
+
+Open a local video or record the desktop to create an AgentCard. Use the bottom
+tabs to work with clips, frames, audio, captions, agents, and analysis. Flip to
+**Paperboy** to copy the JSON Schema or export the card. **Harvest** can bundle
+the card, original recording, and derived files as a `.paperboy.zip`.
+
+FFmpeg and FFprobe enable video inspection and exports. Configure an optional
+`whisper-cli` executable and model under **Settings** for local speech
+transcription. **Voices** uses the installed Windows speech voices.
+
 #### Using the native F# CLI
 
 The runnable binary is built from `apps\Yumlog.Native.Cli`. The `apps\Yumlog.Native` project is the implementation library.

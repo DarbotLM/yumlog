@@ -5,7 +5,7 @@ open System.Threading
 open System.Windows.Forms
 
 module Program =
-    [<EntryPoint>]
+    [<STAThread; EntryPoint>]
     let main _ =
         let mutable createdNew = false
         use instanceMutex = new Mutex(true, @"Local\DarbotLabs.Yumlog.Native", &createdNew)
