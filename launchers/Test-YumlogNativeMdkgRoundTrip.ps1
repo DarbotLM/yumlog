@@ -4,14 +4,14 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
-$Project = Join-Path $RepoRoot 'apps\Yumlog.Native\Yumlog.Native.fsproj'
+$Project = Join-Path $RepoRoot 'apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj'
 
 dotnet build $Project -c $Configuration --nologo
 if ($LASTEXITCODE -ne 0) { throw "Native build failed with exit code $LASTEXITCODE." }
 
-$Dll = Join-Path $RepoRoot "apps\Yumlog.Native\bin\$Configuration\net10.0-windows10.0.26100.0\win-x64\Yumlog.Native.dll"
+$Dll = Join-Path $RepoRoot "apps\Yumlog.Native.Cli\bin\$Configuration\net10.0-windows10.0.26100.0\win-x64\Yumlog.Native.Cli.dll"
 if (-not (Test-Path $Dll)) {
-    throw "Yumlog.Native.dll was not produced at $Dll"
+    throw "Yumlog.Native.Cli.dll was not produced at $Dll"
 }
 
 $WorkDir = Join-Path $RepoRoot 'apps\Yumlog.Native\obj\MdkgRoundTrip'

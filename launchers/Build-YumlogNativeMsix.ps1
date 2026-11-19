@@ -1,11 +1,11 @@
 [CmdletBinding()]
 param(
-    [string]$ProjectPath = "S:\Yumlog\apps\Yumlog.Native\Yumlog.Native.fsproj",
+    [string]$ProjectPath = (Join-Path $PSScriptRoot "..\apps\Yumlog.Native\Yumlog.Native.fsproj"),
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
     [ValidateSet("win-x64")]
     [string]$RuntimeIdentifier = "win-x64",
-    [string]$OutputRoot = "S:\Yumlog\dist\Yumlog.Native",
+    [string]$OutputRoot = (Join-Path $PSScriptRoot "..\dist\Yumlog.Native"),
     [switch]$NoSign,
     [switch]$ForceNewCertificate
 )
@@ -139,6 +139,17 @@ if (Test-Path -LiteralPath $assetsSource) {
 $exePath = Join-Path $layoutDirectory "$assemblyName.exe"
 if (-not (Test-Path -LiteralPath $exePath)) {
     throw "Packaged executable not found in layout: $exePath"
+}
+
+$cliProject = Join-Path $projectDirectory "..\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj"
+dotnet publish $cliProject -c $Configuration -r $RuntimeIdentifier --self-contained true -p:PublishSingleFile=false --nologo
+if ($LASTEXITCODE -ne 0) {
+    throw "Yumlog CLI publish failed with exit code $LASTEXITCODE."
+}
+$cliPublish = Join-Path (Split-Path -Parent $cliProject) "bin\$Configuration\$targetFramework\$RuntimeIdentifier\publish"
+Copy-Item -Path (Join-Path $cliPublish "*") -Destination $layoutDirectory -Recurse -Force
+if (-not (Test-Path -LiteralPath (Join-Path $layoutDirectory "Yumlog.Native.Cli.exe"))) {
+    throw "Packaged console executable was not found in layout."
 }
 
 $makeappx = Find-WindowsSdkTool -ToolName "makeappx.exe"

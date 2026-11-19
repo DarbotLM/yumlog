@@ -46,3 +46,9 @@ jobs:
           .\apps\Yumlog.Native\Test-YumlogNativeExtensibility.ps1
           .\launchers\Test-YumlogNativeMdkgRoundTrip.ps1
           .\launchers\Test-YumlogNativeHandoff.ps1
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check Yumlog NPU emulator
+        run: cargo check --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml
+      - name: Test Yumlog NPU emulator
+        run: cargo test --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml

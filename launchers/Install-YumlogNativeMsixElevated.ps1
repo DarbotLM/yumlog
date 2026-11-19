@@ -40,7 +40,7 @@ try {
     Add-AppxPackage -Path (Resolve-Path -LiteralPath $PackagePath).Path
 
     $package = Get-AppxPackage -Name "DarbotLabs.Yumlog.Native" -ErrorAction Stop
-    $aliasPath = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\Yumlog.Native.exe"
+    $aliasPath = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\Yumlog.Native.Cli.exe"
 
     [PSCustomObject]@{
         Installed         = $true
