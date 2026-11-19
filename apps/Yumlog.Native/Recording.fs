@@ -191,7 +191,10 @@ module NativeRecording =
 
         let metadataPath =
             if String.IsNullOrWhiteSpace(config.TimedMetadataOut) then
-                Path.ChangeExtension(outFile, ".mdkg")
+                let path: string | null = Path.ChangeExtension(outFile, ".mdkg")
+                match path with
+                | null -> invalidArg "out-file" "An output path is required."
+                | path -> path
             else
                 Path.GetFullPath(config.TimedMetadataOut)
 

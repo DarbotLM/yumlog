@@ -14,7 +14,7 @@
     <WarningsAsErrors>FS3261;FS3265</WarningsAsErrors>
     <Optimize>true</Optimize>
     <Deterministic>true</Deterministic>
-    <Version>0.4.1</Version>
+    <Version>0.5.0</Version>
     <Authors>Darbot Labs</Authors>
     <Description>Command-line automation host for Yumlog Native.</Description>
   </PropertyGroup>

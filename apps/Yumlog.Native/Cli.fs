@@ -29,6 +29,14 @@ Usage:
                           [--model dir] [--provider cpu|auto] [--high-water 0..1]
                           [--max-tokens n] [--json-out path]
   Yumlog.Native.Cli models
+
+  Yumlog.Native.Cli handoff --input path --out-dir path [--ocr none|auto|windows-ai|raw-com] [--resume]
+  Yumlog.Native.Cli readiness --ocr none|auto|windows-ai|raw-com
+  Yumlog.Native.Cli extensions list [--config path] [--dir path] [--kind kind] [--name text] [--no-builtin] [--no-external]
+  Yumlog.Native.Cli extensions mcp [--config path] [--dir path] [--no-builtin] [--no-external]
+  Yumlog.Native.Cli extensions validate [--config path] [--dir path] [--pattern glob]
+Extension kinds:
+  model, agent, tool, skill, workflow, connector, plugin, extension, mcp-server, api, continuous-ai
 """
 
     let helpText () = usage.Trim()
@@ -40,12 +48,39 @@ Usage:
             | "--config" :: value :: rest -> loop rest value options
             | "--force" :: rest -> loop rest configPath (Map.add "force" "true" options)
             | "--primary" :: rest -> loop rest configPath (Map.add "primary" "true" options)
+            | "--no-builtin" :: rest -> loop rest configPath (Map.add "no-builtin" "true" options)
+            | "--no-external" :: rest -> loop rest configPath (Map.add "no-external" "true" options)
             | "--plan" :: value :: rest -> loop rest configPath (Map.add "plan" value options)
             | option :: value :: rest when option.StartsWith("--") ->
                 loop rest configPath (Map.add (option.Substring(2)) value options)
             | token :: _ -> invalidArg "args" $"Unexpected argument '{token}'."
 
         loop args NativeConfig.defaultConfigPath Map.empty
+
+    let private parseHandoff args =
+        let rec loop remaining options =
+            match remaining with
+            | [] -> options
+            | "--resume" :: rest when not (Map.containsKey "resume" options) ->
+                loop rest (Map.add "resume" "true" options)
+            | key :: value :: rest
+                when List.contains key [ "--input"; "--out-dir"; "--ocr" ]
+                     && not (value.StartsWith("--"))
+                     && not (Map.containsKey key options) ->
+                loop rest (Map.add key value options)
+            | token :: _ -> invalidArg "args" $"Unexpected, duplicate, or incomplete handoff option '{token}'."
+
+        let options = loop args Map.empty
+        let required key =
+            options
+            |> Map.tryFind key
+            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+            |> Option.defaultWith (fun () -> invalidArg "args" $"Missing {key} path.")
+
+        { Input = required "--input"
+          OutDir = required "--out-dir"
+          OcrMode = options |> Map.tryFind "--ocr" |> Option.defaultValue "none"
+          Resume = Map.containsKey "resume" options }
 
     let parse argv =
         match Array.toList argv with
@@ -63,6 +98,10 @@ Usage:
             let configPath, options = parseOptions args
             let appConfig = NativeConfig.load configPath
             Analyze(NativeConfig.mergeAnalyze appConfig.Analyze options, configPath)
+        | "handoff" :: args ->
+            Handoff(parseHandoff args)
+        | [ "readiness"; "--ocr"; mode ] -> Readiness mode
+        | "readiness" :: _ -> invalidArg "args" "Usage: readiness --ocr none|auto|windows-ai|raw-com"
         | "follow" :: args ->
             let configPath, options = parseOptions args
             let appConfig = NativeConfig.load configPath
@@ -80,6 +119,23 @@ Usage:
         | "config" :: "init" :: args ->
             let configPath, options = parseOptions args
             ConfigInit(configPath, Map.containsKey "force" options)
+        | "extensions" :: "mcp" :: args ->
+            let configPath, options = parseOptions args
+            let appConfig = NativeConfig.load configPath
+            ExtensionsMcp(NativeConfig.mergeExtensions appConfig.Extensions options, configPath)
+        | "extensions" :: "validate" :: args ->
+            let configPath, options = parseOptions args
+            let appConfig = NativeConfig.load configPath
+            ExtensionsValidate(NativeConfig.mergeExtensions appConfig.Extensions options, configPath)
+        | "extensions" :: "list" :: args
+        | "extensions" :: "show" :: args
+        | "extensions" :: args ->
+            let configPath, options = parseOptions args
+            let appConfig = NativeConfig.load configPath
+            let get name =
+                options |> Map.tryFind name |> Option.defaultValue ""
+            let query: ExtensionQuery = { Kind = get "kind"; Name = get "name" }
+            ExtensionsShow(NativeConfig.mergeExtensions appConfig.Extensions options, query, configPath)
         | "selftest" :: args ->
             let configPath, options = parseOptions args
             SelfTest(configPath, options |> Map.tryFind "sample-out" |> Option.defaultValue "")

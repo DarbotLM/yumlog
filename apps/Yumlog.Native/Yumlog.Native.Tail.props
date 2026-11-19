@@ -16,6 +16,8 @@
     <Compile Include="$(YumlogNativeDir)Navigation.fs" Link="Navigation.fs" />
     <Compile Include="$(YumlogNativeDir)Orchestration.fs" Link="Orchestration.fs" />
     <Compile Include="$(YumlogNativeDir)OnDeviceLlm.fs" Link="OnDeviceLlm.fs" />
+    <Compile Include="$(YumlogNativeDir)Handoff.fs" Link="Handoff.fs" />
+    <Compile Include="$(YumlogNativeDir)Extensibility.fs" Link="Extensibility.fs" />
     <Compile Include="$(YumlogNativeDir)Cli.fs" Link="Cli.fs" />
   </ItemGroup>
 
