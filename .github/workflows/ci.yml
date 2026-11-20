@@ -59,6 +59,7 @@ jobs:
           .\launchers\Test-YumlogNativeHandoff.ps1 -Configuration Release
       - name: Build and smoke-test production package
         run: |
+          .\launchers\install.ps1
           .\launchers\Build-YumlogProduction.ps1 -DotnetPath dotnet
           .\launchers\Test-YumlogProductionPackage.ps1
       - name: Agent client protocol contracts
