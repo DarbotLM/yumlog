@@ -1,0 +1,203 @@
+{
+  "schemaVersion": "1.0.0",
+  "catalogId": "darbot-media-presets",
+  "durationPresets": [
+    {
+      "id": "5s",
+      "seconds": 5,
+      "label": "5 second clip"
+    },
+    {
+      "id": "15s",
+      "seconds": 15,
+      "label": "15 second statement"
+    },
+    {
+      "id": "30s",
+      "seconds": 30,
+      "label": "30 seconds"
+    },
+    {
+      "id": "1m",
+      "seconds": 60,
+      "label": "1 minute"
+    },
+    {
+      "id": "2m",
+      "seconds": 120,
+      "label": "2 minutes"
+    },
+    {
+      "id": "3m",
+      "seconds": 180,
+      "label": "3 minutes"
+    },
+    {
+      "id": "5m",
+      "seconds": 300,
+      "label": "5 minutes"
+    },
+    {
+      "id": "10m",
+      "seconds": 600,
+      "label": "10 minutes"
+    },
+    {
+      "id": "15m",
+      "seconds": 900,
+      "label": "15 minutes"
+    },
+    {
+      "id": "30m",
+      "seconds": 1800,
+      "label": "30 minutes"
+    },
+    {
+      "id": "45m",
+      "seconds": 2700,
+      "label": "45 minutes"
+    },
+    {
+      "id": "60m",
+      "seconds": 3600,
+      "label": "60 minutes"
+    },
+    {
+      "id": "90m",
+      "seconds": 5400,
+      "label": "90 minutes"
+    },
+    {
+      "id": "120m",
+      "seconds": 7200,
+      "label": "120 minutes"
+    }
+  ],
+  "frameRatePresets": [
+    {
+      "id": "23.976",
+      "numerator": 24000,
+      "denominator": 1001
+    },
+    {
+      "id": "24",
+      "numerator": 24,
+      "denominator": 1
+    },
+    {
+      "id": "25",
+      "numerator": 25,
+      "denominator": 1
+    },
+    {
+      "id": "29.97",
+      "numerator": 30000,
+      "denominator": 1001
+    },
+    {
+      "id": "30",
+      "numerator": 30,
+      "denominator": 1
+    },
+    {
+      "id": "50",
+      "numerator": 50,
+      "denominator": 1
+    },
+    {
+      "id": "59.94",
+      "numerator": 60000,
+      "denominator": 1001
+    },
+    {
+      "id": "60",
+      "numerator": 60,
+      "denominator": 1
+    },
+    {
+      "id": "120",
+      "numerator": 120,
+      "denominator": 1
+    }
+  ],
+  "resolutionPresets": [
+    {
+      "id": "480p",
+      "width": 854,
+      "height": 480
+    },
+    {
+      "id": "720p",
+      "width": 1280,
+      "height": 720
+    },
+    {
+      "id": "1080p",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "1440p",
+      "width": 2560,
+      "height": 1440
+    },
+    {
+      "id": "2160p",
+      "width": 3840,
+      "height": 2160
+    },
+    {
+      "id": "portrait-720p",
+      "width": 720,
+      "height": 1280
+    },
+    {
+      "id": "portrait-1080p",
+      "width": 1080,
+      "height": 1920
+    },
+    {
+      "id": "square-1080p",
+      "width": 1080,
+      "height": 1080
+    }
+  ],
+  "audioPresets": [
+    {
+      "id": "speech-16k-mono",
+      "sampleRate": 16000,
+      "channels": 1
+    },
+    {
+      "id": "speech-24k-mono",
+      "sampleRate": 24000,
+      "channels": 1
+    },
+    {
+      "id": "music-44k-stereo",
+      "sampleRate": 44100,
+      "channels": 2
+    },
+    {
+      "id": "video-48k-stereo",
+      "sampleRate": 48000,
+      "channels": 2
+    },
+    {
+      "id": "master-96k-stereo",
+      "sampleRate": 96000,
+      "channels": 2
+    }
+  ],
+  "defaults": {
+    "duration": "3m",
+    "frameRate": "30",
+    "resolution": "1080p",
+    "audio": "video-48k-stereo"
+  },
+  "semantics": {
+    "duration": "An authoring or recording target. Always measure actual duration; never silently pad, truncate or accelerate speech.",
+    "frameRate": "Exact rational rate. Adapters must reject unsupported rates explicitly.",
+    "resolution": "Output dimensions; fitting must preserve aspect ratio unless an explicit crop is selected."
+  }
+}

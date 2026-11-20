@@ -4,6 +4,34 @@ open System
 open System.IO
 
 module NativeConfig =
+    /// Shared catalog is embedded so installed CLI and desktop resolve the same IDs.
+    let applyMediaPresets (options: Map<string,string>) =
+        use stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("Yumlog.MediaPresets.json")
+        if isNull stream then failwith "Embedded media preset catalog missing."
+        use document = System.Text.Json.JsonDocument.Parse(stream |> nonNull)
+        let resolve (group:string) (id:string) : System.Text.Json.JsonElement =
+            document.RootElement.GetProperty(group).EnumerateArray()
+            |> Seq.tryFind (fun item -> item.GetProperty("id").GetString() = id)
+            |> Option.defaultWith (fun () -> invalidArg "preset" $"Unknown media preset: {id}")
+        let mutable result = options
+        match Map.tryFind "duration-preset" options with
+        | Some id ->
+            if Map.containsKey "duration" options then invalidArg "duration" "Choose --duration or --duration-preset, not both."
+            let seconds = (resolve "durationPresets" id).GetProperty("seconds").GetInt32()
+            result <- Map.add "duration" (string seconds) result
+        | None -> ()
+        match Map.tryFind "frame-rate-preset" options with
+        | Some id ->
+            if Map.containsKey "fps" options then invalidArg "fps" "Choose --fps or --frame-rate-preset, not both."
+            let rate = resolve "frameRatePresets" id
+            if rate.GetProperty("denominator").GetInt32() <> 1 then
+                invalidArg "frame-rate-preset" "Native capture requires an integer frame rate; use an explicit export conversion for fractional rates."
+            result <- Map.add "fps" (string (rate.GetProperty("numerator").GetInt32())) result
+        | None -> ()
+        if Map.containsKey "resolution-preset" options then
+            invalidArg "resolution-preset" "Native capture uses monitor dimensions. Resolve the export filter with launchers/media-presets.ps1."
+        result
+
     let defaultConfigPath =
         Path.Combine("config", "yumlog.native.json")
 

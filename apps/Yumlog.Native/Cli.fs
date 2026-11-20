@@ -9,7 +9,7 @@ Yumlog.Native.Cli
 
 Usage:
   Yumlog.Native.Cli capture [--config path] [--out-dir path] [--fps n] [--duration n] [--count n] [--primary]
-  Yumlog.Native.Cli record [--config path] [--out-file path] [--fps n] [--duration n]
+  Yumlog.Native.Cli record [--duration-preset 5s|15s|30s|1m|2m|3m|5m|10m|15m|30m|45m|60m|90m|120m] [--frame-rate-preset 24|25|30|50|60|120] [--config path] [--out-file path] [--fps n] [--duration n]
                            [--backend auto|nvenc|x265|ffmpeg] [--lossless true|false] [--preset name]
                            [--container mp4] [--x265 path] [--capture-backend wgc]
                            [--monitor-index n] [--disable-capture-border true|false]
@@ -49,7 +49,7 @@ Extension kinds:
     let private parseOptions args =
         let rec loop remaining configPath options =
             match remaining with
-            | [] -> configPath, options
+            | [] -> configPath, NativeConfig.applyMediaPresets options
             | "--config" :: value :: rest -> loop rest value options
             | "--force" :: rest -> loop rest configPath (Map.add "force" "true" options)
             | "--primary" :: rest -> loop rest configPath (Map.add "primary" "true" options)
