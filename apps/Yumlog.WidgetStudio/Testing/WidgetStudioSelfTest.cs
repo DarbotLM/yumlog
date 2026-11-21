@@ -65,6 +65,7 @@ public static class WidgetStudioSelfTest
         CheckVersionNegotiation(capabilityProject, checks);
         CheckCapabilityDiagnostics(capabilityProject, checks);
         CheckExtensionBag(capabilityProject, checks);
+        CheckIgniteFixture(samplesDirectory, checks);
 
         await CheckPackagesAsync(
             samplesDirectory,
@@ -325,6 +326,68 @@ public static class WidgetStudioSelfTest
 
     private static string FormatCodes(WidgetValidationReport report)
         => string.Join(", ", report.Issues.Select(issue => issue.Code).Distinct(StringComparer.Ordinal));
+
+    // Real Studio export (Microsoft Ignite widget, schema 1.1, preferredModel qwen3-0.6b)
+    // kept as a migration fixture: newer validators and packagers must keep accepting it.
+    private static void CheckIgniteFixture(string samplesDirectory, List<SelfTestCheck> checks)
+    {
+        var root = Path.Combine(samplesDirectory, "fixtures", "microsoft-ignite");
+        var manifestPath = Path.Combine(root, "microsoft-ignite.widget.json");
+        var zipPath = Path.Combine(root, "microsoft-ignite.widget.zip");
+        try
+        {
+            var project = WidgetStudioValidator.Load(manifestPath);
+            var report = WidgetStudioValidator.Validate(project);
+            Add(checks, "fixture.ignite.version", string.Equals(project.SchemaVersion, WidgetStudioSchema.CapabilityVersion, StringComparison.Ordinal),
+                $"schemaVersion={project.SchemaVersion}");
+            Add(checks, "fixture.ignite.valid", report.IsValid, FormatErrors(report));
+
+            var manifestBytes = File.ReadAllBytes(manifestPath);
+            using var document = JsonDocument.Parse(manifestBytes);
+            var models = new List<string>();
+            CollectStrings(document.RootElement, "preferredModel", models);
+            Add(checks, "fixture.ignite.preferredModel", models.Contains("qwen3-0.6b", StringComparer.Ordinal),
+                models.Count == 0 ? "preferredModel not found" : $"preferredModel={string.Join(",", models)}");
+
+            using var archive = System.IO.Compression.ZipFile.OpenRead(zipPath);
+            var widgetEntry = archive.GetEntry("widget.json");
+            var packagedMatches = false;
+            if (widgetEntry is not null)
+            {
+                using var stream = widgetEntry.Open();
+                using var buffer = new MemoryStream();
+                stream.CopyTo(buffer);
+                packagedMatches = buffer.ToArray().AsSpan().SequenceEqual(manifestBytes);
+            }
+            var required = new[] { "widget.json", "package-manifest.json", "validation-report.json", "preview/index.html" };
+            var missing = required.Where(name => archive.GetEntry(name) is null).ToArray();
+            Add(checks, "fixture.ignite.package", packagedMatches && missing.Length == 0 && File.Exists(Path.Combine(root, "preview", "index.html")),
+                missing.Length == 0 ? $"widget.json in package matches manifest={packagedMatches}" : $"missing: {string.Join(",", missing)}");
+        }
+        catch (Exception error) when (error is IOException or JsonException or InvalidDataException or UnauthorizedAccessException)
+        {
+            Add(checks, "fixture.ignite.load", false, error.Message);
+        }
+    }
+
+    private static void CollectStrings(JsonElement element, string propertyName, List<string> values)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                {
+                    if (property.NameEquals(propertyName) && property.Value.ValueKind == JsonValueKind.String)
+                        values.Add(property.Value.GetString() ?? string.Empty);
+                    CollectStrings(property.Value, propertyName, values);
+                }
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                    CollectStrings(item, propertyName, values);
+                break;
+        }
+    }
 
     private static void Add(List<SelfTestCheck> checks, string name, bool passed, string detail)
         => checks.Add(new SelfTestCheck(name, passed, detail));

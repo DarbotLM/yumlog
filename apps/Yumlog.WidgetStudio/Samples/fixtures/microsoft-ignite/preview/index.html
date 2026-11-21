@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Microsoft Ignite A2SWE Project Preview</title>
+  <style>
+    :root { color-scheme: dark; --bg: #0f172a; --panel: #111827; --tile: #1f2937; --accent: #7c3aed; --text: #e5e7eb; --muted: #9ca3af; --ok: #22c55e; --warn: #f59e0b; --error: #ef4444; }
+    body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: linear-gradient(135deg, #0f172a, #111827); color: var(--text); }
+    main { max-width: 1120px; margin: 0 auto; padding: 32px; }
+    .tile { border: 1px solid rgba(255,255,255,.12); border-radius: 24px; background: rgba(31,41,55,.88); box-shadow: 0 24px 72px rgba(0,0,0,.35); overflow: hidden; }
+    .hero { padding: 28px; background: radial-gradient(circle at top right, rgba(124,58,237,.48), transparent 34%), var(--tile); }
+    .badge { display: inline-flex; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 999px; background: rgba(124,58,237,.22); color: #ddd6fe; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; padding: 24px; }
+    section, .card { border: 1px solid rgba(255,255,255,.10); border-radius: 18px; background: rgba(17,24,39,.84); padding: 18px; }
+    h1, h2, h3 { margin: 0 0 10px; } p { color: var(--muted); line-height: 1.5; } code, pre { background: rgba(15,23,42,.9); border-radius: 12px; } pre { overflow: auto; padding: 14px; color: #c4b5fd; }
+    ul { margin: 0; padding-left: 20px; } li { margin: 6px 0; } .ok { color: var(--ok); } .warning { color: var(--warn); } .error { color: var(--error); }
+  </style>
+</head>
+<body>
+  <main>
+    <article class="tile">
+      <div class="hero">
+        <span class="badge">adaptiveLiveTile · interval</span>
+        <h1>Microsoft Ignite A2SWE Project</h1>
+        <p>Production-ready A2SWE project generated for Microsoft Ignite with APIM, ACP, OCR, capability, self-reflection, and continuous-agent contracts.</p>
+        <p><strong>Widget id:</strong> <code>a2swe.microsoft-ignite</code></p>
+      </div>
+      <div class="grid">
+<section>
+  <h2>Data sources</h2>
+  <ul><li>paperboy.capture.latest (apimOperation) -&gt; apim.capture.latest</li><li>paperboy.context.plan (acpEnvelope) -&gt; acp.tile.plan</li><li>paperboy.mdkg.widgetstudio (mdkgLayer) -&gt; </li></ul>
+</section>
+<section>
+  <h2>ACP actions</h2>
+  <ul><li>acp.tile.refresh &#183; paperboy.livetile.refresh &#183; invoke</li></ul>
+</section>
+<section>
+  <h2>APIM bindings</h2>
+  <ul><li>GET /yumlog/native/captures/latest &#183; yumlog.native.capture.latest</li></ul>
+</section>
+<section>
+  <h2>Render states</h2>
+  <ul><li>tile.idle &#183; Idle &#183; Waiting for a capture or ACP event</li><li>tile.ready &#183; Ready &#183; Show latest capture health and next action</li><li>tile.error &#183; Error &#183; Expose APIM, ACP, or capability failure state</li></ul>
+</section>
+      </div>
+<div class="grid">
+<section>
+  <h2>Capabilities &#183; apiSurface</h2>
+  <ul><li>cap.api.widgetstudio-validate v1.0 &#183; http &#183; preview &#183; invoke &#183; manual</li></ul>
+</section>
+<section>
+  <h2>Capabilities &#183; connector</h2>
+  <ul><li>cap.connector.apim-capture v1.0 &#183; apim &#183; stable &#183; read &#183; interval</li></ul>
+</section>
+<section>
+  <h2>Capabilities &#183; continuousAi</h2>
+  <ul><li>cap.continuous.tile-watch v1.0 &#183; event &#183; experimental &#183; read/invoke &#183; continuous</li></ul>
+</section>
+<section>
+  <h2>Capabilities &#183; extension</h2>
+  <ul><li>cap.extension.theme-paperboy v1.0 &#183; file &#183; stable &#183; read &#183; onLoad</li></ul>
+</section>
+<section>
+  <h2>Capabilities &#183; mcpServer</h2>
+  <ul><li>cap.mcp.paperboy-bridge v1.0 &#183; mcp &#183; preview &#183; read/invoke &#183; onLoad</li></ul>
+</section>
+<section>
+  <h2>Capabilities &#183; plugin</h2>
+  <ul><li>cap.plugin.modelcard-cache v1.0 &#183; inProcess &#183; experimental &#183; read/write &#183; onLoad</li></ul>
+</section>
+<section>
+  <h2>Capabilities &#183; skill</h2>
+  <ul><li>cap.skill.tile-summarize v1.0 &#183; inProcess &#183; preview &#183; read &#183; onLoad</li></ul>
+</section>
+<section>
+  <h2>Capabilities &#183; tool</h2>
+  <ul><li>cap.tool.ocr-analyze v1.0 &#183; acp &#183; stable &#183; invoke &#183; manual</li></ul>
+</section>
+<section>
+  <h2>Capabilities &#183; workflow</h2>
+  <ul><li>cap.workflow.capture-to-tile v1.0 &#183; inProcess &#183; preview &#183; read/invoke &#183; event</li></ul>
+</section>
+<section>
+  <h2>Capabilities &#183; x-darbot.observer</h2>
+  <ul><li>cap.x-darbot.tile-telemetry v1.0 &#183; x-darbot.inproc &#183; experimental &#183; read &#183; manual</li></ul>
+</section>
+</div>
+      <div class="grid">
+        <section>
+          <h2>Refresh cadence</h2>
+          <p>Mode <code>interval</code>, interval <code>30s</code>, stale after <code>120s</code>.</p>
+        </section>
+        <section>
+          <h2>Validation</h2>
+          <p class="ok">Ready for package handoff.</p>
+<ul><li class="warning">[warning] $.widget.capabilities[9].kind Vendor capability kind &#39;x-darbot.observer&#39; is outside the core contract; hosts may ignore it.</li><li class="warning">[warning] $.widget.capabilities[9].transport Vendor capability transport &#39;x-darbot.inproc&#39; is outside the core contract; hosts may ignore it.</li><li class="warning">[warning] $.package.packageId Package id should start with the widget id for deterministic handoff.</li></ul>
+        </section>
+      </div>
+      <div class="grid">
+        <section>
+          <h2>Sample payload</h2>
+          <pre>{
+  &quot;status&quot;: &quot;ready&quot;,
+  &quot;summary&quot;: &quot;3 new screenshots indexed&quot;,
+  &quot;lastUpdatedUtc&quot;: &quot;2026-07-27T07:39:55Z&quot;,
+  &quot;changeScore&quot;: 0.82
+}</pre>
+        </section>
+        <section>
+          <h2>Render bindings</h2>
+<section>
+  <h2>Bindings</h2>
+  <ul><li>binding.status.badge: paperboy.capture.latest$.status -&gt; hero.badge (status)</li><li>binding.summary.text: paperboy.capture.latest$.summary -&gt; body.summary (text)</li><li>binding.plan.intent: paperboy.context.plan$.intent -&gt; actions.primary (text)</li></ul>
+</section>
+        </section>
+      </div>
+    </article>
+  </main>
+</body>
+</html>
