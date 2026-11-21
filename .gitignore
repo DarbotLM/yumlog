@@ -81,3 +81,6 @@ clippyclaw-validation-*/
 *.p12
 .env
 .env.local
+
+# Local speech models (large, fetched by launchers/Install-YumlogVoiceTools.ps1)
+.tools/whisper/
