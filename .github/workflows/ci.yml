@@ -42,7 +42,7 @@ jobs:
       - name: Bundle and extension contracts
         run: |
           Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
-          $result = Invoke-Pester -Path .\Skills\Test-ScreenSkills.Tests.ps1, .\Skills\Test-PaperboyBundle.Tests.ps1, .\Skills\Test-PaperboyExtensions.Tests.ps1 -Output Detailed -PassThru
+          $result = Invoke-Pester -Path .\Skills\Test-ScreenSkills.Tests.ps1, .\Skills\Test-PaperboyBundle.Tests.ps1, .\Skills\Test-PaperboyExtensions.Tests.ps1, .\Skills\Test-PaperboyAgentCardPaths.Tests.ps1 -Output Detailed -PassThru
           if ($result.FailedCount -gt 0 -or $result.PassedCount -eq 0) { exit 1 }
       - name: Build APIM foundation
         run: dotnet build .\apps\Yumlog.APIM.Service\Yumlog.APIM.Service.fsproj -c Release
