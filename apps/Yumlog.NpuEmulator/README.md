@@ -26,6 +26,9 @@ runtime consistent across platforms and resolves the GTK2-era `glib 0.18`
 dependency outside the patched range. Tauri 3 is currently alpha, and CEF builds
 require Rust 1.95+, CMake, Ninja, and a C/C++ toolchain. The first build downloads
 the pinned CEF distribution; later builds reuse it.
+The CEF dependency chain pins an older Kuchikiki PHF generator, so the repository
+patches that build-only crate in `src-tauri/vendor/phf_generator-randfix` to use
+`rand 0.8.6` and avoids retaining the vulnerable `rand 0.7` family.
 
 Rust-only validation:
 
@@ -34,6 +37,7 @@ cd apps\Yumlog.NpuEmulator\src-tauri
 cargo test --locked
 cargo check --locked
 cargo tree --locked -i glib --target all
+cargo tree --locked -d --target all
 ```
 
 ## Runtime model

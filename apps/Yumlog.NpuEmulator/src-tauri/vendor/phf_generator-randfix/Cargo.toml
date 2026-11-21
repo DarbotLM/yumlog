@@ -1,0 +1,13 @@
+[package]
+name = "phf_generator"
+authors = ["Steven Fackler <sfackler@gmail.com>"]
+version = "0.8.1"
+license = "MIT"
+description = "PHF generation logic with a patched rand dependency for Yumlog"
+repository = "https://github.com/sfackler/rust-phf"
+edition = "2018"
+publish = false
+
+[dependencies]
+rand = { version = "0.8.6", features = ["small_rng"] }
+phf_shared = "0.8.0"

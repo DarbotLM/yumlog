@@ -172,6 +172,8 @@ function Invoke-Gate {
                 cargo check --locked --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml
                 $graph = cargo tree --locked --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml -i glib --target all
                 if ($LASTEXITCODE -ne 0 -or ($graph -join [Environment]::NewLine) -match 'glib v0\.(?:[0-9]|1[0-9])\.') { throw "Vulnerable glib graph detected." }
+                $randGraph = cargo tree --locked --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml -d --target all
+                if (($randGraph -join [Environment]::NewLine) -match 'rand v0\.7\.') { throw "Vulnerable rand graph detected." }
             }
             Invoke-Checked 'NPU emulator cargo test' { cargo test --locked --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml }
             Invoke-Checked 'NPU emulator executable' { npm run --prefix apps/Yumlog.NpuEmulator tauri -- build --ci --no-bundle }
