@@ -635,3 +635,68 @@ Local media under `archive\51PercentCrew` and generated integration reports unde
 `Scratchpad\apim-roundtrip` are not application source and are excluded from new
 commits. Historical research notes under `hevc-swarm-out` describe design work;
 the component guides distinguish implemented behavior from planned integration.
+
+
+### Studio semantic Library
+
+Yumlog Studio can index an entire recording into a searchable Library of atomic
+flipcards. Open a video, configure FFmpeg and local Whisper in Settings, then use
+**Insights → Run full decimation**. Studio reuses the latest attached timestamped
+SRT/VTT transcript; otherwise it transcribes the audio locally. Plain text
+transcripts can be viewed, but need timestamps for decimation.
+
+**Library** supports modality filters, text search, frame previews, source-time
+navigation, JSON/evidence flips, and JSON export. Each card records source and
+evidence SHA-256 hashes, time ranges, and measured/inferred/unknown attributes.
+Use **Attach document**, then run decimation again to include text, Markdown,
+JSON, or CSV files up to 8 MB. Repeated runs deduplicate identical document
+content within each extension. Document schema extraction covers the first JSON
+object, CSV header, or Markdown headings and requires review before reuse.
+
+The video cards retain scene-change frames, sampled color palettes, classic
+Windows OCR text, and lexical tags. Audio cards group timestamped speech into
+roughly 30-second segments with transcript-derived word counts, speaking rate,
+and heuristic intent. Exact fonts, avatar or speaker identity, diagram structure,
+icons, acoustic tone, calibrated confidence, signal quality, and perspective are
+explicitly unknown. PDF/DOCX parsing and automatic speaker diarization are not
+implemented by semantic decimation. The separate **Agent Voices** panel is
+under the local processing pipeline in **Agents** and also appears in **Voices**.
+Choose **Detect agent voices** to group speech from the selected recording's
+audio track using local Voice Tools. Each group has a fictional alias, a
+downloadable WAV of its source excerpts, and a flipcard with playable intervals
+in the original video. Short groups can reflect overlap or model splits.
+Script narration uses the installed Windows text-to-speech voices.
+
+On Windows x64, install the pinned local speaker detector and models by running
+`.\launchers\Install-YumlogVoiceTools.ps1` from this repository. Once installed,
+speaker detection runs on the computer without a network connection.
+
+The versioned `urn:yumlog:bitdot-layers:v1` output uses one-second occupancy bins
+with bits for visual changes (1), speech (2), lexical tags (4), and document
+schemas (8), compressed into contiguous runs. This is Yumlog's local sparse
+index definition. Full-duration coverage describes processing and indexing;
+object recognition remains limited to the extractors listed above. MDKG graph
+snapshots track both card starts and ends over the recording's half-open time
+interval. Its proof checks establish structural inclusion and integrity.
+
+**Insights → Import verified analysis** accepts a `source-sha256.json` whose
+`Hash` matches the current recording, with supported transcript and analysis
+sidecars beside it. The hash checks source identity; transcript alignment remains
+caller-supplied. Whisper cue endpoints that exceed duration by at most 250 ms
+are clamped in the index only; the original transcript bytes are retained.
+
+**Harvest** exports a Paperboy card or ZIP bundle containing the original and
+derived files. When moving a bundle, resolve embedded original paths through
+`paperboy-manifest.json`'s `sourcePath` → `bundlePath` mapping and verify its
+SHA-256 hashes. Settings and recording artifacts persist between launches.
+
+Run the real-media integration suite with an explicit short speech clip:
+
+```powershell
+.\launchers\Test-YumlogStudio.ps1 -InputVideo 'C:\recordings\speech.mp4'
+```
+
+The runner expects the repository-local FFmpeg and Whisper tools/model under
+`.tools`, builds the native app, and retains its JSON test report in `dist`.
+It exercises settings, transcription, capability loading, narration, documents,
+Library, repeated decimation, MDKG timing, exports, and bundle integrity.

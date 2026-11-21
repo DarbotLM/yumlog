@@ -53,7 +53,7 @@
         "required": ["id", "kind", "name", "start", "duration", "exists"],
         "properties": {
           "id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-          "kind": { "enum": ["clip", "screenshot", "frame", "audio", "spectrogram", "transcript", "voice", "ocr", "runbook", "timedMetadata"] },
+          "kind": { "enum": ["clip", "screenshot", "frame", "audio", "spectrogram", "transcript", "voice", "ocr", "runbook", "timedMetadata", "atomicLibrary", "bitdot", "semanticReport", "schema", "document", "agentVoices", "agentVoice"] },
           "name": { "type": "string", "minLength": 1 },
           "start": { "$ref": "#/$defs/seconds" },
           "duration": { "$ref": "#/$defs/seconds" },
@@ -88,7 +88,7 @@
         },
         "tabs": {
           "type": "array",
-          "minItems": 9,
+          "minItems": 10,
           "items": false,
           "prefixItems": [
             { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "video" }, "label": { "const": "Video" } } }] },
@@ -98,6 +98,7 @@
             { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "agents" }, "label": { "const": "Agents" } } }] },
             { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "voices" }, "label": { "const": "Voices" } } }] },
             { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "insights" }, "label": { "const": "Insights" } } }] },
+            { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "library" }, "label": { "const": "Library" } } }] },
             { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "harvest" }, "label": { "const": "Harvest" } } }] },
             { "allOf": [{ "$ref": "#/$defs/tab" }, { "properties": { "key": { "const": "settings" }, "label": { "const": "Settings" } } }] }
           ]

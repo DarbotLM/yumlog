@@ -4,15 +4,17 @@ const $ = id => document.getElementById(id);
 const bridge = window.chrome?.webview;
 const media = id => "https://yumlog-media.local/" + encodeURIComponent(id);
 const tabIcons = { video: "\uE714", screenshot: "\uE722", audio: "\uE767", transcript: "\uE8A5",
-  agents: "\uE716", voices: "\uE720", insights: "\uE9D9", harvest: "\uE7B8", settings: "\uE713" };
+  agents: "\uE716", voices: "\uE720", insights: "\uE9D9", harvest: "\uE7B8", settings: "\uE713", library: "\uE8F1" };
 const outputLabels = { clip: "Clip", screenshot: "Screenshot", frame: "Frame", audio: "Audio", spectrogram: "Spectrogram",
-  transcript: "Transcript", voice: "Narration", ocr: "Frame analysis", runbook: "MDKG runbook", timedMetadata: "Timed metadata" };
+  transcript: "Transcript", voice: "Narration", ocr: "Frame analysis", runbook: "MDKG runbook", timedMetadata: "Timed metadata", atomicLibrary: "Atomic library", semanticReport: "Semantic report", bitdot: "Bitdot layers", document: "Source document", schema: "Atomic card schema",
+  agentVoice: "Speaker excerpts", agentVoices: "Agent Voices timeline" };
 const backLabels = { video: "Video inputs and clips", screenshot: "Screenshot inputs and frames",
-  audio: "Audio outputs", transcript: "Transcript sources", agents: "Agent capabilities", voices: "Voice synthesis",
-  insights: "Analysis outputs", harvest: "Harvest and delivery", settings: "Workspace settings" };
+  audio: "Audio outputs", transcript: "Transcript sources", agents: "Agent capabilities", voices: "Agent Voices and narration",
+  insights: "Analysis outputs", harvest: "Harvest and delivery", settings: "Workspace settings", library: "Atomic widget schemas" };
 const busyLabels = { import: "Opening recordings…", record: "Recording the desktop…", clip: "Exporting clip…",
   scenes: "Finding scene changes…", transcribe: "Transcribing audio locally…", bundle: "Building Paperboy bundle…",
-  loadOcr: "Loading the Windows AI OCR model…", spectrogram: "Generating spectrogram…" };
+  loadOcr: "Loading the Windows AI OCR model…", spectrogram: "Generating spectrogram…", decimate: "Processing the full recording: transcript, visual changes and semantic layers…", importAnalysis: "Verifying and importing analysis…", library: "Loading atomic library…", attachDocument: "Distilling document fields…",
+  detectAgentVoices: "Detecting speaker turns and exporting voice previews…", agentVoices: "Loading Agent Voices…" };
 
 let state = { videos: [], selectedId: "", tabs: [], artifacts: [], settings: { cardSize: "studio" }, paperboy: null };
 let active = "video";
@@ -24,6 +26,18 @@ let clipPreview = "";
 let stageKey = "";
 let voices = [];
 let capabilities = [];
+let agentVoiceManifest = null;
+let agentVoiceError = "";
+let agentVoiceRevision = 0;
+let voiceSlice = null;
+const agentVoiceFlips = new Set();
+const agentVoicePages = new Map();
+let atomicLibrary = null;
+let libraryRevision = 0;
+let atomicQuery = "";
+let atomicModality = "all";
+let atomicPage = 0;
+const atomicFlips = new Set();
 const responses = new Map();
 const drafts = new Map();
 const cursors = new Map();
@@ -78,11 +92,48 @@ async function run(command, payload = {}) {
         clipPreview = "";
         flipped = false;
         active = "video";
+        atomicLibrary = null;
+        atomicQuery = "";
+        atomicModality = "all";
+        atomicPage = 0;
+        atomicFlips.clear();
+        libraryRevision++;
+        agentVoiceManifest = null;
+        agentVoiceError = "";
+        agentVoiceFlips.clear();
+        agentVoicePages.clear();
+        agentVoiceRevision++;
+        voiceSlice = null;
       }
       state = reply.state;
     }
     if (command === "catalog") capabilities = reply.data || [];
     if (command === "voices") voices = reply.data || [];
+    if (command === "agentVoices" || command === "detectAgentVoices") {
+      agentVoiceManifest = typeof reply.data === "string" ? JSON.parse(reply.data) : reply.data;
+      agentVoiceError = "";
+      agentVoiceRevision++;
+      if (command === "detectAgentVoices") {
+        agentVoiceFlips.clear();
+        agentVoicePages.clear();
+      }
+    }
+    if (command === "library") {
+      atomicLibrary = typeof reply.data === "string" ? JSON.parse(reply.data) : reply.data;
+      libraryRevision++;
+    }
+    if (["decimate", "importAnalysis", "attachDocument"].includes(command)) {
+      atomicLibrary = null;
+      atomicPage = 0;
+      libraryRevision++;
+      if (outputs("atomicLibrary").length) {
+        const libraryReply = await send("library", {});
+        if (!libraryReply.error) {
+          atomicLibrary = typeof libraryReply.data === "string" ? JSON.parse(libraryReply.data) : libraryReply.data;
+          libraryRevision++;
+        }
+      }
+    }
     if (command === "readArtifact") previews.set(payload.artifactId, reply.data || "");
     if (command === "saveSettings") {
       for (const name of ["outputDirectory", "ffmpegPath", "whisperPath", "whisperModel"]) drafts.delete("settings:" + name);
@@ -92,6 +143,11 @@ async function run(command, payload = {}) {
   } catch (error) {
     status(error.message, true);
     if (command === "setSize") $("card-size").value = state.settings.cardSize;
+    if (command === "agentVoices" || command === "detectAgentVoices") {
+      agentVoiceError = error.message;
+      agentVoiceRevision++;
+      renderCard();
+    }
   } finally {
     setBusy(false);
   }
@@ -241,9 +297,16 @@ function setFlip(value) {
 function switchTab(key) {
   if (key !== active) pauseMedia();
   const changed = active !== key;
-  if (changed) selectedOutput = "";
+  if (changed) {
+    selectedOutput = "";
+    if (key !== "video") voiceSlice = null;
+  }
   active = key;
   renderCard();
+  if (changed && key === "library" && !atomicLibrary && outputs("atomicLibrary").length && !pending) run("library");
+  if (changed && ["agents", "voices"].includes(key) && !agentVoiceManifest && outputs("agentVoices").length && !pending) {
+    run("agentVoices");
+  }
   if (changed && !flipped && matchMedia("(max-width: 820px)").matches) {
     $("card-title").scrollIntoView({ block: "nearest" });
   }
@@ -288,14 +351,15 @@ function renderTabs() {
   if (bar.children.length) $("card-panel").setAttribute("aria-labelledby", "tab-" + active);
 }
 
-function seek(seconds) {
+function seek(seconds, slice = null) {
   if (!Number.isFinite(seconds) || !video()?.exists) return;
   cursors.set(state.selectedId, seconds);
+  voiceSlice = slice;
   clipPreview = "";
   setFlip(false);
   switchTab("video");
   const player = $("player");
-  if (player?.readyState > 0) player.currentTime = Math.min(seconds, player.duration || seconds);
+  if (!slice && player?.readyState > 0) player.currentTime = Math.min(seconds, player.duration || seconds);
 }
 
 function videoSurface(item) {
@@ -307,13 +371,14 @@ function videoSurface(item) {
   Object.assign(player, { id: "player", controls: true, preload: "metadata", src: media(selected?.id || item.id) });
   player.setAttribute("aria-label", selected ? "Clip preview" : "Recording preview");
   if (item.hasPoster && !selected) player.poster = media(item.id + "-poster");
-  if (!selected) {
+  if (!selected && voiceSlice) configureVoiceSlice(player, voiceSlice.turn);
+  if (!selected && !voiceSlice) {
     player.addEventListener("loadedmetadata", () => {
       const saved = cursors.get(item.id) || 0;
       if (saved && Number.isFinite(player.duration)) player.currentTime = Math.min(saved, player.duration);
     });
-    player.addEventListener("timeupdate", () => cursors.set(item.id, player.currentTime));
   }
+  if (!selected) player.addEventListener("timeupdate", () => cursors.set(item.id, player.currentTime));
   player.addEventListener("error", () => {
     if (player.isConnected) wrap.replaceChildren(empty("Preview unavailable",
       "Open the source in your default player, or export a compatible MP4 clip.",
@@ -342,7 +407,7 @@ function outputList(items, { frames = false } = {}) {
     control.addEventListener("click", () => {
       selectedOutput = item.id;
       list.querySelectorAll("button").forEach(row => row.setAttribute("aria-pressed", String(row === control)));
-      if (active === "transcript" || active === "insights") {
+      if (["transcript", "insights", "voices"].includes(active)) {
         renderFront(video());
         Array.from($("tool-face").querySelectorAll("[data-output]")).find(row => row.dataset.output === item.id)?.focus();
       }
@@ -384,11 +449,303 @@ function transcript(raw) {
   return cues.childElementCount ? cues : element("pre", "code", raw);
 }
 
+function atomicLibrarySurface() {
+  if (!atomicLibrary || !Array.isArray(atomicLibrary.cards)) {
+    return empty("Atomic Library", "Run full decimation in Insights to distill source-linked cards for visual frames, speech and document fields.",
+      outputs("atomicLibrary").length ? act("Load library", "library", {}, { primary: true }) : button("Open Insights", () => switchTab("insights")));
+  }
+  const wrap = element("section", "atomic-library");
+  const toolbar = element("div", "atomic-toolbar");
+  const search = element("input");
+  Object.assign(search, { type: "search", value: atomicQuery, placeholder: "Find a schema, tag, field or phrase" });
+  search.setAttribute("aria-label", "Search atomic library");
+  const modality = element("select");
+  modality.setAttribute("aria-label", "Filter card modality");
+  for (const value of ["all", "video", "audio", "document"]) {
+    const option = element("option", "", value === "all" ? "All modalities" : value[0].toUpperCase() + value.slice(1));
+    option.value = value;
+    modality.append(option);
+  }
+  modality.value = atomicModality;
+  const count = element("p", "hint");
+  count.setAttribute("role", "status");
+  const grid = element("div", "atomic-grid");
+  const pager = element("div", "surface-toolbar");
+  function updateCards() {
+    const query = atomicQuery.trim().toLocaleLowerCase();
+    const matches = atomicLibrary.cards.filter(card => (atomicModality === "all" || card.modality === atomicModality) && (!query || JSON.stringify(card).toLocaleLowerCase().includes(query)));
+    const pages = Math.max(1, Math.ceil(matches.length / 24));
+    atomicPage = Math.min(atomicPage, pages - 1);
+    const visible = matches.slice(atomicPage * 24, (atomicPage + 1) * 24);
+    count.textContent = matches.length + " of " + atomicLibrary.cards.length + " atomic cards · " + "source-linked, with explicit unknowns";
+    grid.replaceChildren(...visible.map(atomicCard));
+    if (!visible.length) grid.append(element("p", "hint", "No cards match these filters."));
+    pager.replaceChildren(button("Previous", () => { atomicPage--; updateCards(); }, { enabled: atomicPage > 0 }),
+      element("span", "", "Page " + (atomicPage + 1) + " of " + pages),
+      button("Next", () => { atomicPage++; updateCards(); }, { enabled: atomicPage + 1 < pages }));
+  }
+  search.addEventListener("input", () => { atomicQuery = search.value; atomicPage = 0; updateCards(); });
+  modality.addEventListener("change", () => { atomicModality = modality.value; atomicPage = 0; updateCards(); });
+  toolbar.append(search, modality);
+  wrap.append(toolbar, count, grid, pager);
+  updateCards();
+  return wrap;
+}
+
+function atomicCard(card) {
+  const tile = element("article", "atomic-card");
+  const head = element("div", "atomic-card-head");
+  head.append(element("span", "atomic-modality", card.modality || "unknown"), element("span", "hint", card.kind || "schema"));
+  const title = element("h3", "", card.title || card.id || "Untitled card");
+  const body = element("div", "atomic-card-body");
+  const toggle = button("", () => { atomicFlips.has(card.id) ? atomicFlips.delete(card.id) : atomicFlips.add(card.id); show(); });
+  const actions = element("div", "atomic-actions");
+  actions.append(toggle);
+  const seconds = Number(card.startSeconds ?? card.evidence?.startSeconds);
+  if (Number.isFinite(seconds) && card.modality !== "document") actions.append(button("Source " + clock(seconds), () => seek(seconds), { enabled: !!video()?.exists }));
+  const formatValue = value => value == null ? "Unknown" : typeof value === "object" ? JSON.stringify(value) : String(value);
+  function show() {
+    const back = atomicFlips.has(card.id);
+    toggle.textContent = back ? "Show card" : "Flip: JSON & evidence";
+    toggle.setAttribute("aria-expanded", String(back));
+    tile.dataset.flipped = String(back);
+    if (back) {
+      body.replaceChildren(element("p", "hint", "Atomic card instance · includes schema fields, provenance and source evidence"), element("pre", "code atomic-json", JSON.stringify(card, null, 2)));
+      return;
+    }
+    const nodes = [];
+    const evidencePath = card.evidence?.path || "";
+    const normalizePath = path => String(path || "").replace(/\\/g, "/").toLowerCase();
+    const images = outputs("frame", "screenshot");
+    const exact = evidencePath && state.artifactPaths
+      ? images.find(image => normalizePath(state.artifactPaths[image.id]) === normalizePath(evidencePath)) : null;
+    const basenameMatches = images.filter(image => image.name === evidencePath.split(/[\\/]/).pop());
+    const preview = exact || (!state.artifactPaths && basenameMatches.length === 1 ? basenameMatches[0] : null);
+    if (preview) {
+      const image = element("img", "atomic-preview");
+      Object.assign(image, { src: media(preview.id), alt: "Source frame for " + (card.title || "this card"), loading: "lazy" });
+      nodes.push(image);
+    }
+    const tags = element("div", "atomic-tags");
+    for (const tag of (Array.isArray(card.tags) ? card.tags : []).slice(0, 10)) tags.append(element("span", "", tag));
+    if (tags.children.length) nodes.push(tags);
+    const attrs = Object.entries(card.attributes || {});
+    const measured = attrs.filter(([, value]) => value != null && value !== "unknown" && !(typeof value === "object" && ["unknown", "unavailable-or-empty"].includes(value.status)));
+    if (measured.length) {
+      const list = element("dl", "atomic-attributes");
+      for (const [key, value] of measured.slice(0, 5)) {
+        const row = element("div");
+        const label = key.replace(/([a-z])([A-Z])/g, "$1 $2");
+        const wrapped = value && typeof value === "object" && "status" in value;
+        row.append(element("dt", "", label + (wrapped ? " · " + value.status : "")),
+          element("dd", "", formatValue(wrapped ? value.value : value)));
+        list.append(row);
+      }
+      nodes.push(list);
+    }
+    const unknownCount = attrs.length - measured.length;
+    if (unknownCount) nodes.push(element("p", "hint", unknownCount + (unknownCount === 1 ? " attribute unavailable" : " attributes unavailable") + " · inspect the reverse for details"));
+    nodes.push(element("p", "atomic-evidence", card.provenance?.method || card.provenance?.type || "See provenance on reverse"));
+    body.replaceChildren(...nodes);
+  }
+  tile.append(head, title, body, actions);
+  show();
+  return tile;
+}
+
+function voiceTime(seconds) {
+  const milliseconds = Math.round(seconds * 1000);
+  return clock(Math.floor(milliseconds / 1000)) + "." + String(milliseconds % 1000).padStart(3, "0");
+}
+
+function voiceRange(turn) {
+  return voiceTime(turn.startSeconds) + " – " + voiceTime(turn.endSeconds);
+}
+
+function playAgentVoiceTurn(voice, index, returnTab = active) {
+  const turn = voice.turns[index];
+  if (turn) seek(turn.startSeconds, { voice, turn, index, returnTab });
+}
+
+function configureVoiceSlice(player, turn) {
+  const start = () => Math.min(turn.startSeconds, player.duration || turn.startSeconds);
+  const end = () => Math.min(turn.endSeconds, player.duration || turn.endSeconds);
+  let stopTimer;
+  const cancelStop = () => clearTimeout(stopTimer);
+  const scheduleStop = () => {
+    cancelStop();
+    if (player.paused || player.seeking || !player.isConnected) return;
+    const remaining = end() - player.currentTime;
+    if (remaining <= 0) {
+      player.pause();
+      player.currentTime = end();
+    } else {
+      stopTimer = setTimeout(scheduleStop, Math.max(16, remaining * 1000 / player.playbackRate));
+    }
+  };
+  player.addEventListener("play", () => {
+    if (player.currentTime < start() || player.currentTime >= end()) player.currentTime = start();
+    scheduleStop();
+  });
+  player.addEventListener("seeking", cancelStop);
+  player.addEventListener("seeked", () => {
+    if (!player.paused && player.currentTime < start()) player.currentTime = start();
+    else scheduleStop();
+  });
+  player.addEventListener("pause", cancelStop);
+  player.addEventListener("timeupdate", scheduleStop);
+  player.addEventListener("ratechange", scheduleStop);
+  player.addEventListener("loadedmetadata", () => {
+    if (!player.isConnected || end() <= start()) return;
+    const play = () => {
+      if (player.isConnected) player.play().catch(() => {});
+    };
+    if (Math.abs(player.currentTime - start()) < 0.001) play();
+    else {
+      player.addEventListener("seeked", play, { once: true });
+      player.currentTime = start();
+    }
+  }, { once: true });
+}
+
+function voiceSliceControls(slice) {
+  const controls = element("section", "voice-slice-controls");
+  controls.setAttribute("aria-label", "Agent voice appearance");
+  const description = element("p", "hint",
+    "Appearance " + (slice.index + 1) + " of " + slice.voice.turns.length + " · " + voiceRange(slice.turn));
+  const actions = element("div", "voice-actions");
+  actions.append(button("Previous appearance", () => playAgentVoiceTurn(slice.voice, slice.index - 1, slice.returnTab),
+      { enabled: slice.index > 0 }),
+    button("Next appearance", () => playAgentVoiceTurn(slice.voice, slice.index + 1, slice.returnTab),
+      { enabled: slice.index + 1 < slice.voice.turns.length }),
+    button("Return to Agent Voices", () => {
+      switchTab(slice.returnTab);
+      const card = $("agent-voice-" + slice.voice.id);
+      card?.scrollIntoView({ block: "nearest" });
+      card?.querySelector(".voice-flip")?.focus({ preventScroll: true });
+    }),
+    button("Full recording", () => seek($("player")?.currentTime ?? slice.turn.startSeconds)));
+  controls.append(element("h3", "", slice.voice.alias), description, actions);
+  return controls;
+}
+
+function agentVoiceTile(voice, item, displayDuration) {
+  const tile = element("article", "voice-tile");
+  tile.id = "agent-voice-" + voice.id;
+  const title = element("h4", "", voice.alias);
+  const preview = outputs("agentVoice").find(output => output.id === voice.artifactId);
+  const summary = element("p", "hint", voice.turns.length + (voice.turns.length === 1 ? " appearance" : " appearances") +
+    " · " + clock(voice.durationSeconds) + " total");
+  if (voice.durationSeconds < 3) summary.append(element("span", "voice-brief", "Brief detection"));
+  const timeline = element("div", "voice-timeline");
+  timeline.setAttribute("aria-hidden", "true");
+  if (displayDuration > 0) {
+    for (const turn of voice.turns) {
+      const segment = element("i");
+      segment.style.left = 100 * turn.startSeconds / displayDuration + "%";
+      segment.style.width = 100 * (turn.endSeconds - turn.startSeconds) / displayDuration + "%";
+      timeline.append(segment);
+    }
+  }
+  const body = element("div", "voice-tile-body");
+  body.id = "agent-voice-content-" + voice.id;
+  const flip = button("", () => {
+    if (agentVoiceFlips.has(voice.id)) agentVoiceFlips.delete(voice.id);
+    else agentVoiceFlips.add(voice.id);
+    show();
+  }, { className: "voice-flip" });
+  flip.setAttribute("aria-controls", body.id);
+  const showTimeline = () => {
+    const pageSize = 8;
+    const pageCount = Math.ceil(voice.turns.length / pageSize);
+    const page = Math.min(agentVoicePages.get(voice.id) || 0, Math.max(0, pageCount - 1));
+    const list = element("ol", "voice-appearances");
+    list.start = page * pageSize + 1;
+    for (const [offset, turn] of voice.turns.slice(page * pageSize, (page + 1) * pageSize).entries()) {
+      const index = page * pageSize + offset;
+      const row = element("li");
+      row.append(button(voiceRange(turn), () => playAgentVoiceTurn(voice, index), { enabled: !!item?.exists }));
+      list.append(row);
+    }
+    const children = [element("p", "hint", "Play a source appearance"), list];
+    if (pageCount > 1) {
+      const go = value => { agentVoicePages.set(voice.id, value); show(); };
+      const pager = element("div", "voice-actions voice-pager");
+      pager.append(button("Previous page", () => go(page - 1), { enabled: page > 0 }),
+        element("span", "hint", (page + 1) + " of " + pageCount),
+        button("Next page", () => go(page + 1), { enabled: page + 1 < pageCount }));
+      children.push(pager);
+    }
+    if (preview) children.push(act("Save speaker WAV", "exportArtifact", { artifactId: preview.id }));
+    body.replaceChildren(...children);
+  };
+  function show() {
+    const back = agentVoiceFlips.has(voice.id);
+    tile.dataset.flipped = String(back);
+    flip.textContent = back ? "Show audio preview" : "Flip to appearances";
+    flip.setAttribute("aria-expanded", String(back));
+    flip.setAttribute("aria-label", flip.textContent + " for " + voice.alias);
+    if (back) showTimeline();
+    else if (preview) {
+      const audio = audioPlayer(preview);
+      audio.preload = "none";
+      audio.setAttribute("aria-label", "Combined source excerpts for " + voice.alias);
+      audio.addEventListener("play", () => {
+        $("tool-face").querySelectorAll("audio").forEach(other => { if (other !== audio) other.pause(); });
+      });
+      body.replaceChildren(element("p", "hint", "Combined source excerpts"), audio);
+    } else body.replaceChildren(element("p", "hint", "Source excerpts are unavailable."));
+  }
+  tile.append(title, summary, timeline, body, flip);
+  show();
+  return tile;
+}
+
+function agentVoicesSurface(item) {
+  const section = element("section", "agent-voices");
+  section.id = "agent-voices";
+  section.setAttribute("aria-labelledby", "agent-voices-title");
+  const heading = element("h3", "", "Agent Voices");
+  heading.id = "agent-voices-title";
+  const detected = [...(agentVoiceManifest?.voices || [])].sort((a, b) => b.durationSeconds - a.durationSeconds);
+  const canDetect = !!item?.exists && (!item.media || !!item.media.audioCodec);
+  const header = element("div", "voice-actions agent-voices-header");
+  header.append(heading);
+  if (canDetect) header.append(act(detected.length ? "Detect again" : "Detect agent voices", "detectAgentVoices", {},
+    { primary: !detected.length }));
+  section.append(header);
+  if (agentVoiceError) {
+    const error = element("p", "voice-error", agentVoiceError);
+    error.setAttribute("role", "alert");
+    section.append(error);
+  }
+  if (!detected.length) {
+    let message = "Open a recording with audio to detect its speakers.";
+    if (item?.exists && !canDetect) message = "This recording has no audio track.";
+    else if (agentVoiceManifest) message = "No speaker voices were detected.";
+    else if (outputs("agentVoices").length) message = "Load the saved speaker timeline and excerpts.";
+    else if (canDetect) message = "Group speech by speaker and assign each voice a fictional alias.";
+    section.append(element("p", "hint", message));
+    if (!agentVoiceManifest && outputs("agentVoices").length) {
+      section.append(act("Load agent voices", "agentVoices"));
+    }
+    return section;
+  }
+  section.append(element("p", "hint", detected.length + (detected.length === 1 ? " detected speaker group" : " detected speaker groups") +
+    " with fictional aliases. Brief groups may be fragments of another speaker or contain overlapping speech."));
+  const grid = element("div", "voice-grid");
+  const duration = agentVoiceManifest.durationSeconds || item?.media?.duration || 0;
+  grid.append(...detected.map(voice => agentVoiceTile(voice, item, duration)));
+  section.append(grid);
+  return section;
+}
+
 function renderFront(item) {
   const face = $("tool-face");
   const key = [active, item?.id, item?.exists, clipPreview, ...state.artifacts.map(output => output.id),
-    capabilities.length, voices.length, previews.size, JSON.stringify(item?.media),
-    active === "settings" ? JSON.stringify(state.settings) : "", ["transcript", "insights"].includes(active) ? selectedOutput : ""].join(":");
+    capabilities.length, voices.length, previews.size, libraryRevision, JSON.stringify(item?.media),
+    active === "settings" ? JSON.stringify(state.settings) : "", ["transcript", "insights", "voices"].includes(active) ? selectedOutput : "",
+    ["agents", "voices"].includes(active) ? agentVoiceRevision : "", voiceSlice?.voice.id, voiceSlice?.index].join(":");
   // Keep the native media element stable when a command returns the same view.
   if (key === stageKey) return;
   stageKey = key;
@@ -398,8 +755,8 @@ function renderFront(item) {
   switch (active) {
     case "video": {
       const clips = outputs("clip");
-      contents = [videoSurface(item)];
-      if (clips.length) {
+      contents = voiceSlice ? [voiceSliceControls(voiceSlice), videoSurface(item)] : [videoSurface(item)];
+      if (clips.length && !voiceSlice) {
         const line = element("div", "surface-toolbar");
         line.append(element("span", "", clipPreview ? "Clip preview" : "Source recording"));
         if (clipPreview) line.append(button("Back to source", () => { clipPreview = ""; renderFront(item); }));
@@ -438,22 +795,42 @@ function renderFront(item) {
       break;
     }
     case "agents": {
-      if (!capabilities.length) contents = [empty("Native capabilities", "Load Yumlog’s local agent, workflow, model, and extension catalog.")];
-      else {
+      const stages = [
+        ["Media inspector", !!item?.media, "Track metadata and source duration"],
+        ["Transcript worker", !!outputs("transcript").length, "Local Whisper or attached captions; no speaker identity inference"],
+        ["Visual sampler", !!outputs("frame", "screenshot").length, "Source-time scene frames and measured colors"],
+        ["Semantic indexer", !!outputs("atomicLibrary").length, "Evidence-linked atomic schemas, lexical tags and bitdot layers"],
+        ["Harvest packager", !!outputs().length, "Source and derived artifacts available to bundle"]
+      ];
+      const pipeline = element("div", "pipeline-stages");
+      for (const [name, ready, description] of stages) {
+        const row = element("article", "capability");
+        row.append(element("strong", "", name), element("small", ready ? "stage-ready" : "", ready ? "Output available" : "Not produced yet"), element("p", "hint", description));
+        pipeline.append(row);
+      }
+      contents = [element("h3", "", "Local processing pipeline"), pipeline, agentVoicesSurface(item)];
+      if (capabilities.length) {
         const catalog = element("div", "item-list");
-        for (const item of capabilities) {
+        for (const capability of capabilities) {
           const row = element("article", "capability");
-          row.append(element("strong", "", item.displayName), element("small", "", item.kind + " · " + item.status), element("p", "hint", item.description));
+          row.append(element("strong", "", capability.displayName), element("small", "", capability.kind + " · " + capability.status), element("p", "hint", capability.description));
           catalog.append(row);
         }
-        contents = [catalog];
+        contents.push(element("h3", "", "Native capability catalog"), catalog);
       }
+      break;
+    }
+    case "library": {
+      contents = [atomicLibrarySurface()];
       break;
     }
     case "voices": {
       const narration = outputs("voice")[0];
-      contents = narration ? [audioPlayer(narration), list("voice")] :
-        [empty("Local voice rendering", "Use a Windows voice to turn a script into a WAV narration.")];
+      contents = [agentVoicesSurface(item)];
+      if (narration) {
+        const selected = outputs("voice").find(value => value.id === selectedOutput) || narration;
+        contents.push(element("h3", "", "Script narration"), audioPlayer(selected), list("voice"));
+      }
       break;
     }
     case "insights": {
@@ -461,8 +838,8 @@ function renderFront(item) {
       contents = !info ? [empty("Recording insights", "Inspect track metadata, analyze a frame, or build a runbook from MDKG.")] :
         [facts([["Duration", clock(info.duration)], ["Video", info.videoCodec.toUpperCase()], ["Frame size", info.width + " × " + info.height],
           ["Audio", info.audioCodec || "No audio track"], ["Subtitles", info.subtitleStreams], ["Size", bytes(info.bytes)]])];
-      if (outputs("ocr", "runbook").length) {
-        contents.push(list("ocr", "runbook"));
+      if (outputs("ocr", "runbook", "semanticReport", "bitdot", "atomicLibrary").length) {
+        contents.push(list("ocr", "runbook", "semanticReport", "bitdot", "atomicLibrary"));
         if (previews.has(selectedOutput)) contents.push(element("pre", "code", previews.get(selectedOutput)));
       }
       break;
@@ -488,7 +865,7 @@ function renderBack() {
     face.replaceChildren();
     return;
   }
-  const layer = card.flipcard.tabs.find(tab => tab.key === active);
+  const layer = card.flipcard.tabs.find(tab => tab.key === active) || { role: "atomic-library", inputs: [], outputs: [] };
   const code = element("pre", "code", JSON.stringify(card, null, 2));
   const details = element("details");
   details.append(element("summary", "", "Full card JSON"), code);
@@ -575,14 +952,16 @@ function renderPane() {
       break;
     }
     case "agents":
-      actions.push(label("Yumlog agents"), stack(act("Load capability catalog", "catalog", {}, { primary: true })),
+      actions.push(label("Local workers"), hint("Run the full recording pipeline from here or Insights. Use Library to inspect the resulting evidence and schemas."),
+        stack(act("Run full decimation", "decimate", {}, { primary: true, enabled: hasSource }), act("Load capability catalog", "catalog")),
+        section("Agent Voices"), button("Browse detected voices", () => $("agent-voices")?.scrollIntoView({ block: "start" })),
         section("Windows AI OCR"), stack(act("Check OCR readiness", "ocrStatus"), act("Load OCR model", "loadOcr")));
       break;
     case "voices": {
       const voice = field("Installed Windows voice", "voice", voices[0]?.name, { options: voices.map(item => item.name) });
       const script = field("Narration script", "script", "", { type: "textarea" });
       script.input.maxLength = 10000;
-      actions.push(label("Voice tools"), stack(act("List installed voices", "voices", {}, { primary: !voices.length })));
+      actions.push(label("Script narration"), stack(act("List installed voices", "voices")));
       if (voices.length) actions.push(voice.wrapper, script.wrapper, stack(act("Render WAV narration", "speak",
         () => ({ voice: voice.value(), script: script.value() }), { primary: true, enabled: !!item })));
       if (!item) actions.push(hint("Open a recording to save narration to its card."));
@@ -591,12 +970,28 @@ function renderPane() {
     case "insights": {
       const frames = outputs("frame", "screenshot");
       const frame = field("Frame for OCR", "ocrFrame", frames[0]?.name, { options: frames.map((image, index) => (index + 1) + ". " + image.name) });
-      actions.push(label("Analysis tools"), stack(act("Refresh media metadata", "probe", {}, { primary: true, enabled: hasSource }),
+      actions.push(label("Semantic layers"), hint("Process the full original recording. Existing attached captions are reused; otherwise configure local Whisper in Settings. Inferred fields are labeled and unsupported attributes stay unknown."),
+        stack(act("Run full decimation", "decimate", {}, { primary: true, enabled: hasSource }),
+          act("Import verified analysis", "importAnalysis", {}, { enabled: hasSource }),
+          button("Browse atomic Library", () => switchTab("library"), { enabled: !!item })),
+        section("Analysis tools"), stack(act("Refresh media metadata", "probe", {}, { enabled: hasSource }),
         act("Export MDKG runbook", "runbook", {}, { enabled: state.hasTimedMetadata })));
       if (!state.hasTimedMetadata) actions.push(hint("Runbook export needs a matching .mdkg sidecar."));
       if (frames.length) actions.push(section("Frame OCR"), frame.wrapper, stack(act("Analyze selected frame", "ocr",
         () => ({ artifactId: frames[frame.input.selectedIndex].id }))));
-      if (current) actions.push(act("View analysis", "readArtifact", { artifactId: current.id }));
+      if (current && ["ocr", "runbook", "semanticReport", "bitdot", "atomicLibrary"].includes(current.kind)) actions.push(act("View analysis", "readArtifact", { artifactId: current.id }));
+      break;
+    }
+    case "library": {
+      const libraryOutput = outputs("atomicLibrary")[0];
+      actions.push(label("Atomic schema library"), hint("Video, audio and document cards retain source evidence. Flip a card to inspect its JSON, provenance and unknown attributes."),
+        stack(act("Load / refresh library", "library", {}, { primary: true, enabled: !!libraryOutput }),
+          act("Run full decimation", "decimate", {}, { enabled: hasSource }),
+          act("Attach source document", "attachDocument", {}, { enabled: !!item })));
+      if (libraryOutput) actions.push(section("Export"), stack(act("Save library JSON", "exportArtifact", { artifactId: libraryOutput.id }), act("Open library file", "openArtifact", { artifactId: libraryOutput.id })));
+      const schemaOutput = outputs("schema")[0];
+      if (schemaOutput) actions.push(act("Save atomic JSON Schema", "exportArtifact", { artifactId: schemaOutput.id }));
+      actions.push(section("Attribute meaning"), hint("Measured: extracted directly. Inferred: a labeled estimate. Unknown: not measured. A field in the schema does not imply that a voice, emotion, avatar, font or identity was detected."));
       break;
     }
     case "harvest":
@@ -638,9 +1033,11 @@ function renderCard() {
 function render() {
   const item = video();
   $("workspace-title").textContent = item?.title || "Capture workspace";
+  $("workspace-title").title = $("workspace-title").textContent;
   $("workspace-meta").textContent = item?.media
     ? [item.name, clock(item.media.duration), item.media.width + " × " + item.media.height].join("  ·  ")
     : item?.name || "Local recording library";
+  $("workspace-meta").title = $("workspace-meta").textContent;
   renderLibrary();
   renderCard();
 }

@@ -14,7 +14,7 @@
     "ffmpegPath": "",
     "encoder": "libx264",
     "preset": "ultrafast",
-    "backend": "auto",
+    "backend": "ffmpeg",
     "codec": "hevc",
     "lossless": true,
     "container": "mp4",

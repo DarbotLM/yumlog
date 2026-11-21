@@ -23,7 +23,7 @@ module DesktopMedia =
     let extension (path: string) = (Path.GetExtension(path) |> orEmptyIfNull).ToLowerInvariant()
     let number (value: float) = value.ToString("0.######", CultureInfo.InvariantCulture)
 
-    let private run (timeout: int) (executable: string) (arguments: string list) =
+    let internal run (timeout: int) (executable: string) (arguments: string list) =
         let info = ProcessStartInfo(executable, UseShellExecute = false, CreateNoWindow = true,
                                     RedirectStandardOutput = true, RedirectStandardError = true)
         for argument in arguments do
@@ -136,6 +136,12 @@ module DesktopMedia =
 
     let wave executable input output =
         ffmpeg executable "error" [ "-i"; input; "-map"; "0:a:0"; "-c:a"; "pcm_s16le"; output ] |> ignore
+
+    let voiceAnalysisWave executable input output =
+        ffmpeg executable "error"
+            [ "-i"; input; "-map"; "0:a:0"; "-vn"; "-af"; "aresample=async=1:first_pts=0"
+              "-ar"; "16000"; "-ac"; "1"; "-c:a"; "pcm_s16le"; output ]
+        |> ignore
 
     let spectrogram executable input output =
         ffmpeg executable "error"

@@ -61,13 +61,19 @@ module DesktopLibrary =
              Inputs = [| "captionFile"; "subtitleTrack"; "audioTrack"; "whisperModel" |]; Outputs = [| "transcript" |]
              Actions = [| "attachTranscript"; "subtitles"; "transcribe" |] }
            { Key = "agents"; Label = "Agents"; Role = "native-capability-catalog"
-             Inputs = [| "extensionManifests"; "windowsAiRuntime" |]; Outputs = [| "catalog"; "ocrReadiness" |]
-             Actions = [| "catalog"; "ocrStatus"; "loadOcr" |] }
-           { Key = "voices"; Label = "Voices"; Role = "local-speech-synthesis"
-             Inputs = [| "installedVoice"; "script" |]; Outputs = [| "voice" |]; Actions = [| "voices"; "speak" |] }
+             Inputs = [| "extensionManifests"; "windowsAiRuntime"; "audioTrack" |]
+             Outputs = [| "catalog"; "ocrReadiness"; "agentVoices"; "agentVoice" |]
+             Actions = [| "catalog"; "ocrStatus"; "loadOcr"; "detectAgentVoices"; "agentVoices" |] }
+           { Key = "voices"; Label = "Voices"; Role = "recording-speakers-and-narration"
+             Inputs = [| "audioTrack"; "installedVoice"; "script" |]
+             Outputs = [| "agentVoices"; "agentVoice"; "voice" |]
+             Actions = [| "detectAgentVoices"; "agentVoices"; "voices"; "speak" |] }
            { Key = "insights"; Label = "Insights"; Role = "recording-and-frame-analysis"
              Inputs = [| "recording"; "frame"; "timedMetadata" |]; Outputs = [| "mediaInfo"; "ocr"; "runbook" |]
-             Actions = [| "probe"; "ocr"; "runbook" |] }
+             Actions = [| "probe"; "ocr"; "runbook"; "decimate"; "importAnalysis" |] }
+           { Key = "library"; Label = "Library"; Role = "atomic-flipcard-schemas"
+             Inputs = [| "sourceRecording"; "transcript"; "documents" |]; Outputs = [| "atomicLibrary"; "bitdot"; "schema" |]
+             Actions = [| "library"; "decimate"; "attachDocument"; "exportArtifact" |] }
            { Key = "harvest"; Label = "Harvest"; Role = "paperboy-delivery"
              Inputs = [| "recording"; "derivedArtifacts"; "paperboyCard" |]; Outputs = [| "cardJson"; "paperboyBundle" |]
              Actions = [| "exportCard"; "copyCard"; "copySchema"; "bundle"; "openArtifact"; "exportArtifact" |] }
@@ -276,6 +282,7 @@ module DesktopLibrary =
                settings = state.Settings
                tabs = tabs
                artifacts = Array.map descriptor outputs
+               artifactPaths = outputs |> Array.map (fun item -> item.Id, item.Path) |> dict
                hasTimedMetadata = active |> Option.bind metadataPath |> Option.isSome
                paperboy = active |> Option.map (manifest state.Settings.CardSize) |}
 
@@ -315,7 +322,7 @@ module DesktopLibrary =
             | "exportArtifact" -> File.Copy((findArtifact (get "artifactId")).Path, path (), true); result "File exported."
             | "readArtifact" ->
                 let item = findArtifact (get "artifactId")
-                if not (Array.contains item.Kind [| "transcript"; "runbook"; "ocr"; "catalog" |]) then
+                if not (Array.contains item.Kind [| "transcript"; "runbook"; "ocr"; "catalog"; "atomicLibrary"; "semanticReport"; "bitdot"; "schema"; "document"; "agentVoices" |]) then
                     invalidOp "This output cannot be displayed as text."
                 data "" (readPreview item.Path)
             | "setSize" ->
@@ -410,6 +417,66 @@ module DesktopLibrary =
                     else DesktopMedia.transcribe (ffmpeg ()) state.Settings.WhisperPath state.Settings.WhisperModel video.Path
                 createArtifact video "transcript" "transcript.srt" extract
                 result "Transcript saved."
+            | "attachDocument" ->
+                let input = path ()
+                if not (Set.contains (DesktopMedia.extension input) (set [ ".txt"; ".md"; ".json"; ".csv" ])) then
+                    invalidOp "Choose a text, Markdown, JSON, or CSV document."
+                if FileInfo(input).Length > 8000000L then invalidOp "Document exceeds the 8 MB limit."
+                createArtifact (current ()) "document" (fileName input) (fun output -> File.Copy(input, output))
+                result "Document attached. Run decimation to distill its schema."
+            | "importAnalysis" ->
+                let video = source ()
+                let input = path ()
+                if fileName input <> "source-sha256.json" then invalidOp "Select source-sha256.json from the previous analysis directory."
+                use hashDocument = JsonDocument.Parse(File.ReadAllText(input))
+                let expected = field "Hash" hashDocument.RootElement
+                if not (String.Equals(expected, FileHash.sha256 video.Path, StringComparison.OrdinalIgnoreCase)) then
+                    invalidOp "Analysis source hash does not match this recording."
+                let directory = Path.GetDirectoryName(input) |> nonNull
+                let known = [| "transcript", "transcript.srt"; "document", "chapters.json"; "document", "semantic-graph.json"
+                               "semanticReport", "synthesis.json"; "timedMetadata", "semantic-timeline.mdkg"
+                               "semanticReport", "validation.json" |]
+                let imported =
+                    job (fun output ->
+                        let files = known |> Array.choose (fun (kind, name) ->
+                            let from = Path.Combine(directory, name)
+                            if File.Exists(from) then
+                                let target = Path.Combine(output, name)
+                                File.Copy(from, target)
+                                Some(plain kind target)
+                            else None)
+                        if files.Length = 0 then invalidOp "No supported analysis files were found."
+                        File.Copy(input, Path.Combine(output, "source-sha256.json"))
+                        attach video (Array.append files [| plain "semanticReport" (Path.Combine(output, "source-sha256.json")) |])
+                        files.Length)
+                result $"Imported {imported} source-verified analysis files. Run full decimation to build the Library."
+            | "decimate" ->
+                let video = source ()
+                let transcript = video.Artifacts |> Array.tryFind (fun a -> a.Kind = "transcript" && File.Exists(a.Path) && Set.contains (DesktopMedia.extension a.Path) (set [ ".srt"; ".vtt" ]))
+                let count = job (fun directory ->
+                    // Prior runs also retain document evidence. Stage each distinct input once,
+                    // preferring its original filename so repeated decimation stays stable.
+                    let documents =
+                        video.Artifacts
+                        |> Array.filter (fun a -> a.Kind = "document" && File.Exists(a.Path))
+                        |> Array.rev
+                        |> Array.distinctBy (fun a -> DesktopMedia.extension a.Path, FileHash.sha256 a.Path)
+                    if documents.Length > 0 then
+                        let destination = Directory.CreateDirectory(Path.Combine(directory, "documents")).FullName
+                        documents |> Array.iteri (fun i doc -> File.Copy(doc.Path, Path.Combine(destination, string i + "-" + fileName doc.Path)))
+                    let run = StudioSemantic.run (ffmpeg ()) state.Settings.WhisperPath state.Settings.WhisperModel video.Path
+                                  (transcript |> Option.map _.Path |> Option.defaultValue "") directory
+                    let items = run.Artifacts |> Array.map (fun (kind, path, start, duration) -> artifact kind path start duration)
+                    attach video items
+                    run.CardCount)
+                result $"Full-source decimation completed: {count} atomic cards. Open Library for evidence and schemas."
+            | "library" ->
+                let library = (current ()).Artifacts |> Array.tryFind (fun a -> a.Kind = "atomicLibrary" && File.Exists(a.Path))
+                match library with
+                | None -> data "Run full decimation to populate the Library." {| cards = ([||] : string array) |}
+                | Some item ->
+                    use document = JsonDocument.Parse(File.ReadAllText(item.Path))
+                    data "Atomic Library loaded." (document.RootElement.Clone())
             | "catalog" ->
                 let catalog = NativeExtensibility.catalog (config ()).Extensions
                 data "Native capabilities loaded." catalog.Capabilities
@@ -418,6 +485,45 @@ module DesktopLibrary =
                 match WindowsAiOcr.ensureReady() with
                 | Ok () -> result (ocrStatus ())
                 | Error detail -> invalidOp detail
+            | "agentVoices" ->
+                let manifest =
+                    selected () |> Option.bind (fun video ->
+                        video.Artifacts |> Array.tryFind (fun a -> a.Kind = "agentVoices" && File.Exists(a.Path)))
+                match manifest with
+                | None -> data "Detect speakers to build Agent Voices." {| voices = ([||] : string array) |}
+                | Some item ->
+                    use document = JsonDocument.Parse(File.ReadAllText(item.Path))
+                    data "Agent Voices loaded." (document.RootElement.Clone())
+            | "detectAgentVoices" ->
+                let video = source ()
+                let executable = ffmpeg ()
+                let media = DesktopMedia.probe executable video.Path
+                if String.IsNullOrWhiteSpace(media.AudioCodec) then invalidOp "The recording has no audio track."
+                if media.Duration <= 0. then invalidOp "A recording with a known duration is required."
+                if not (StudioDiarization.available ()) then invalidOp (StudioDiarization.status ())
+                let summary =
+                    job (fun directory ->
+                        let sourceHash = FileHash.sha256 video.Path
+                        let voices = StudioAgentVoices.run executable video.Path media.Duration directory
+                        if FileHash.sha256 video.Path <> sourceHash then invalidOp "The recording changed during speaker detection."
+                        let voiceArtifacts =
+                            voices |> Array.map (fun voice ->
+                                artifact "agentVoice" voice.Path (Nullable()) (Nullable(voice.DurationSeconds)))
+                        let entries =
+                            (voices, voiceArtifacts) ||> Array.map2 (fun voice output ->
+                                {| id = voice.Id; alias = voice.Alias; name = fileName voice.Path
+                                   artifactId = output.Id; sha256 = voice.Sha256
+                                   durationSeconds = voice.DurationSeconds; turns = voice.Turns |})
+                        let index = Path.Combine(directory, "agent-voices.json")
+                        let manifest =
+                            {| schema = "urn:yumlog:agent-voices:v1"; method = StudioDiarization.methodName
+                               sourceSha256 = sourceHash; durationSeconds = media.Duration; voices = entries |}
+                        NativeJson.write index manifest
+                        let retained = video.Artifacts |> Array.filter (fun a -> a.Kind <> "agentVoice" && a.Kind <> "agentVoices")
+                        let generated = Array.append [| plain "agentVoices" index |] voiceArtifacts
+                        update { video with Media = Some media; Artifacts = Array.append generated retained }
+                        manifest)
+                data $"Detected {summary.voices.Length} speaker groups. Open Agent Voices to review their appearances." summary
             | "voices" -> data "Installed voices loaded." (DesktopMedia.voices ())
             | "speak" ->
                 let script = get "script"
@@ -440,6 +546,8 @@ module DesktopLibrary =
                 let metadata = metadataPath video |> Option.defaultWith (fun () -> invalidOp "A matching MDKG sidecar is required.")
                 use reader = openReader metadata
                 let runbook = MdkgIntel.buildRunbook reader
+                let verification = MdkgIntel.verifyRunbook reader runbook
+                if not verification.Verified then invalidOp "MDKG proof verification failed."
                 createArtifact video "runbook" "runbook.md" (fun output -> writeText output (MdkgIntel.toMarkdown runbook))
                 result "MDKG runbook exported."
             | "exportCard" ->

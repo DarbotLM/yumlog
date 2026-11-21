@@ -140,6 +140,8 @@ module NativeUi =
             | "import" ->
                 let extensions = DesktopMedia.videoExtensions |> Seq.map (fun item -> "*" + item) |> String.concat ";"
                 chooseFiles true $"Video recordings|{extensions}"
+            | "attachDocument" -> chooseFiles false "Schema documents (*.txt;*.md;*.json;*.csv)|*.txt;*.md;*.json;*.csv"
+            | "importAnalysis" -> chooseFiles false "Source verification manifest (source-sha256.json)|source-sha256.json"
             | "attachTranscript" -> chooseFiles false "Transcript files (*.srt;*.vtt;*.txt)|*.srt;*.vtt;*.txt"
             | "exportCard" -> chooseOutput (workspace.SuggestedName(command, artifactId)) "Paperboy card (*.json)|*.json"
             | "bundle" -> chooseOutput (workspace.SuggestedName(command, artifactId)) "Paperboy bundle (*.zip)|*.zip"
