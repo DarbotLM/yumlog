@@ -62,6 +62,9 @@ if (Test-Path -LiteralPath $ffmpeg) {
         $target = Join-Path $stage "$nativeRoot\.tools\ffmpeg\bin"
         New-Item -ItemType Directory -Path $target -Force | Out-Null
         Copy-Item -LiteralPath $ffmpeg -Destination (Join-Path $target 'ffmpeg.exe') -Force
+        # Studio import reads media properties with the sibling ffprobe.exe; ship it when available.
+        $ffprobe = Join-Path (Split-Path -Parent $ffmpeg) 'ffprobe.exe'
+        if (Test-Path -LiteralPath $ffprobe) { Copy-Item -LiteralPath $ffprobe -Destination (Join-Path $target 'ffprobe.exe') -Force }
     }
 }
 

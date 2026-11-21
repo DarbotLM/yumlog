@@ -33,6 +33,8 @@ if (-not $ffmpeg -and -not (Test-Path $ffmpegExe)) {
     $exe = Get-ChildItem -Path $tempExtract -Recurse -Filter ffmpeg.exe | Select-Object -First 1
     if ($exe) {
         Copy-Item $exe.FullName $ffmpegExe -Force
+        $probe = Join-Path $exe.DirectoryName 'ffprobe.exe'
+        if (Test-Path $probe) { Copy-Item $probe (Join-Path $ffmpegDir 'ffprobe.exe') -Force }
         Write-Host "FFmpeg downloaded to $ffmpegExe"
     } else {
         Write-Host "Warning: Could not find ffmpeg.exe in downloaded package"

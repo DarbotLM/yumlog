@@ -29,10 +29,20 @@ if (Test-Path -LiteralPath $versionRoot) {
 New-Item -ItemType Directory -Path $versionRoot -Force | Out-Null
 Copy-Item -Path (Join-Path $PackagePath '*') -Destination $versionRoot -Recurse -Force
 Set-Content -LiteralPath (Join-Path $Destination 'current.txt') -Value $versionRoot -Encoding UTF8
+# Upgrade in place: one installed version only. Remove other version folders
+# and their user PATH entries once the new version is in place.
+$retired = @(Get-ChildItem -LiteralPath $Destination -Directory | Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' -and $_.Name -ne $manifest.version })
+foreach ($old in $retired) {
+    Remove-Item -LiteralPath $old.FullName -Recurse -Force
+}
 
 $cliRoot = Join-Path $versionRoot 'Yumlog.Native.Cli'
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-$pathEntries = @($userPath -split ';' | Where-Object { $_ })
+$retiredCliRoots = @($retired | ForEach-Object { Join-Path $_.FullName 'Yumlog.Native.Cli' })
+$pathEntries = @($userPath -split ';' | Where-Object { $_ -and $retiredCliRoots -notcontains $_ })
+if (-not $NoUserIntegration -and $retiredCliRoots.Count -gt 0 -and $pathEntries -contains $cliRoot) {
+    [Environment]::SetEnvironmentVariable('Path', ($pathEntries -join ';'), 'User')
+}
 if (-not $NoUserIntegration -and $pathEntries -notcontains $cliRoot) {
     [Environment]::SetEnvironmentVariable('Path', (($pathEntries + $cliRoot) -join ';'), 'User')
 }
@@ -42,6 +52,7 @@ if (-not $NoUserIntegration) {
     $shell = New-Object -ComObject WScript.Shell
     $shortcutDirectory = Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs\DarbotLabs Yumlog'
     New-Item -ItemType Directory -Path $shortcutDirectory -Force | Out-Null
+    Get-ChildItem -LiteralPath $shortcutDirectory -Filter '*.lnk' | Where-Object { $_.Name -notlike "* $($manifest.version).lnk" } | Remove-Item -Force
 
     foreach ($shortcut in @(
         @{ Name = 'Yumlog Native 0.5.0.lnk'; Target = Join-Path $versionRoot 'Yumlog.Native\Yumlog.Native.exe'; Arguments = '' }
