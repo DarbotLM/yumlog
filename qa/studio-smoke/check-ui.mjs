@@ -2,8 +2,12 @@ import { chromium } from "playwright-core";
 import { strict as assert } from "node:assert";
 
 const browser = await chromium.connectOverCDP("http://127.0.0.1:47619");
-const context = browser.contexts()[0];
-const page = context.pages().find(item => item.url().includes("yumlog-studio.local"));
+// The DevTools endpoint can list the Studio target a moment before Playwright attaches it, so poll every context briefly.
+let page;
+for (let attempt = 0; attempt < 60 && !page; attempt++) {
+  page = browser.contexts().flatMap(item => item.pages()).find(item => item.url().includes("yumlog-studio.local"));
+  if (!page) await new Promise(resolve => setTimeout(resolve, 250));
+}
 assert.ok(page, "Could not find the native studio WebView");
 page.setDefaultTimeout(8000);
 const errors = [];
