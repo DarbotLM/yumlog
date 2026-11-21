@@ -69,6 +69,8 @@ jobs:
         run: .\launchers\Test-YumlogStudioSmoke.ps1 -SkipUi
       - name: Media preset contracts
         run: dotnet fsi .\launchers\test-media-presets.fsx
+      - name: Review tools contracts (OCR, MDKG import, runbook proofs)
+        run: .\launchers\Test-YumlogReviewTools.ps1
       - name: Agent client protocol contracts
         run: .\launchers\Test-YumlogAgentProtocol.ps1 -DotnetPath dotnet
       - name: Native CLI self-test
