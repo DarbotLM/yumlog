@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$PackagePath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist\Yumlog-0.5.0\package'),
+    [string]$PackagePath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist\Yumlog-0.6.0\package'),
     [string]$Destination = (Join-Path $env:LOCALAPPDATA 'DarbotLabs\Yumlog'),
     [switch]$Force,
     [switch]$NoUserIntegration
@@ -13,7 +13,7 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
 }
 
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.version -ne '0.5.0') {
+if ($manifest.version -ne '0.6.0') {
     throw "Unsupported package version '$($manifest.version)'."
 }
 
@@ -55,9 +55,9 @@ if (-not $NoUserIntegration) {
     Get-ChildItem -LiteralPath $shortcutDirectory -Filter '*.lnk' | Where-Object { $_.Name -notlike "* $($manifest.version).lnk" } | Remove-Item -Force
 
     foreach ($shortcut in @(
-        @{ Name = 'Yumlog Native 0.5.0.lnk'; Target = Join-Path $versionRoot 'Yumlog.Native\Yumlog.Native.exe'; Arguments = '' }
-        @{ Name = 'Paperboy 0.5.0.lnk'; Target = Join-Path $versionRoot 'Paperboy\Paperboy.exe'; Arguments = '' }
-        @{ Name = 'Yumlog Widget Studio 0.5.0.lnk'; Target = Join-Path $versionRoot 'Yumlog.WidgetStudio\Yumlog.WidgetStudio.exe'; Arguments = '--help' }
+        @{ Name = 'Yumlog Native 0.6.0.lnk'; Target = Join-Path $versionRoot 'Yumlog.Native\Yumlog.Native.exe'; Arguments = '' }
+        @{ Name = 'Paperboy 0.6.0.lnk'; Target = Join-Path $versionRoot 'Paperboy\Paperboy.exe'; Arguments = '' }
+        @{ Name = 'Yumlog Widget Studio 0.6.0.lnk'; Target = Join-Path $versionRoot 'Yumlog.WidgetStudio\Yumlog.WidgetStudio.exe'; Arguments = '--help' }
     )) {
         $link = $shell.CreateShortcut((Join-Path $shortcutDirectory $shortcut.Name))
         $link.TargetPath = $shortcut.Target

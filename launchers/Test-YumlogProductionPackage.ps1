@@ -1,13 +1,13 @@
 [CmdletBinding()]
 param(
-    [string]$PackagePath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist\Yumlog-0.5.0\package'),
+    [string]$PackagePath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist\Yumlog-0.6.0\package'),
     [string]$InstallRoot = (Join-Path ([IO.Path]::GetTempPath()) ("yumlog-package-smoke-" + [Guid]::NewGuid().ToString('N')))
 )
 
 $ErrorActionPreference = 'Stop'
 $manifestPath = Join-Path $PackagePath 'release-manifest.json'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.version -ne '0.5.0') {
+if ($manifest.version -ne '0.6.0') {
     throw "Unexpected package version: $($manifest.version)"
 }
 

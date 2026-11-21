@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Configuration = 'Release',
-    [string]$OutputRoot = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist\Yumlog-0.5.0'),
+    [string]$OutputRoot = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist\Yumlog-0.6.0'),
     [string]$DotnetPath = 'dotnet'
 )
 
@@ -90,7 +90,7 @@ $exes = @(
 
 $manifest = [ordered]@{
     schema = 'urn:yumlog:release:v1'
-    version = '0.5.0'
+    version = '0.6.0'
     configuration = $Configuration
     createdUtc = [DateTimeOffset]::UtcNow.ToString('o')
     runtime = 'win-x64-self-contained'
@@ -127,12 +127,12 @@ $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -En
 Remove-Item -LiteralPath $packageRoot -Recurse -Force -ErrorAction SilentlyContinue
 Move-Item -LiteralPath $stage -Destination $packageRoot
 
-$archivePath = Join-Path $OutputRoot 'Yumlog-0.5.0-win-x64.zip'
+$archivePath = Join-Path $OutputRoot 'Yumlog-0.6.0-win-x64.zip'
 Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
 Compress-Archive -Path (Join-Path $packageRoot '*') -DestinationPath $archivePath -CompressionLevel Optimal
 
 [pscustomobject]@{
-    Version = '0.5.0'
+    Version = '0.6.0'
     Package = $packageRoot
     Archive = $archivePath
     Bytes = (Get-Item -LiteralPath $archivePath).Length
