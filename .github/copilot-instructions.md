@@ -50,16 +50,16 @@ MCP apps, a local APIM/ACP service foundation, and Widget Studio authoring.
 6. **WgcCapture.fs / NvencHevc.fs / X265Encoder.fs / HevcMux.fs**: Native capture and HEVC encode path
 7. **Mdkg.fs / MdkgIntel.fs**: `.mdkg` container plus timeline, citations, and runbooks
 8. **OnDeviceLlm.fs**: Offline model reasoning and live screen watching
-9. **SelfTest.fs**: Built-in 16-check correctness suite
+9. **SelfTest.fs**: Built-in 17-check correctness suite
 
 ## Working on the native stack
 
 - Build `apps/Yumlog.Native.Cli` for automation and `apps/Yumlog.Native` for the packaged Studio host.
 - Keep the nine Studio modes and their Paperboy flip-card/side-pane contracts aligned with `DesktopLibrary.tabs`.
-- `bin/` and `obj/` are committed despite appearing in `.gitignore`. **Rebuild before trusting `selftest`**; a stale binary once reported 15 checks while the source defined 16.
+- `bin/` and `obj/` are committed despite appearing in `.gitignore`. **Rebuild before trusting `selftest`**; a stale binary once reported 15 checks while the source defined 16 (it defines 17 now).
 - `selftest` JSON keys are `passed`, `passedCount`, `failedCount`, `cases`.
 - CLI JSON output has trailing non-JSON text; slice between the first `{` and last `}`.
-- Unknown CLI arguments are ignored silently, so a flag typo exits 0 and does nothing.
+- Unknown CLI options are rejected with `Unknown option(s) for <command>` and a non-zero exit, so a flag typo fails loudly.
 - To make a fact visible to `reason`, put it in the grounding string in `OnDeviceLlm.fs`. Runbook proofs are **not** sent to the model.
 
 ### Testing the screen-observation features

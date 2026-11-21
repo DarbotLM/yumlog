@@ -37,7 +37,7 @@ darbot.yumlog is a Windows capture and local automation toolkit. It includes the
 * **Verifiable Runbooks:** `MdkgIntel.fs` turns a recording into ordered steps where every claim carries a resolvable `mdkg://` citation, so a runbook can be checked rather than trusted.
 * **On-Device Reasoning:** `reason` answers questions about a recording using a local model through ONNX Runtime GenAI. Fully offline. See [`docs/ON-DEVICE-REASONING.md`](docs/ON-DEVICE-REASONING.md).
 * **Live Screen Watching:** `watch` observes the screen and narrates on an interval, skipping frames below a change threshold.
-* **Built-in Self Test:** `selftest` runs 16 correctness checks over the container, intelligence layer, and hardware probes, including a negative control on timing coverage.
+* **Built-in Self Test:** `selftest` runs 17 correctness checks over the container, intelligence layer, and hardware probes, including a negative control on timing coverage.
 * **Screen Recording:** Record the desktop at configurable FPS and duration.
 * **Paperboy:** WPF desktop bundling, model-management and live-tile UI, capability/extension catalogs, and a companion stdio MCP host. See the [Paperboy guide](apps/Paperboy.Desktop/README.md).
 * **APIM/ACP Service:** Local metadata catalogs and authenticated envelope scaffolding, with Windows Service launchers. See [service coverage and limitations](apps/Yumlog.APIM.Service/README.md).

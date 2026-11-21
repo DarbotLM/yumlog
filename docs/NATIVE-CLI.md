@@ -24,7 +24,7 @@ $exe = ".\apps\Yumlog.Native.Cli\bin\Release\net10.0-windows10.0.26100.0\win-x64
 | `follow` | Change-gated frame sequence plus a follow manifest |
 | `orchestrate` | Run a multi-step plan file |
 | `config show` / `config init` | Inspect or scaffold `config\yumlog.native.json` |
-| `selftest` | Built-in correctness suite (16 checks) |
+| `selftest` | Built-in correctness suite (17 checks) |
 | `runbook` | Turn an `.mdkg` sidecar into a cited, replayable runbook |
 | `reason` | Answer a question about a recording using an on-device LLM |
 | `watch` | Live screen observation with periodic narration |

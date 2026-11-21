@@ -49,10 +49,10 @@ let reject name action=
     pass name "Invalid input rejected"
 let report passed error=NativeJson.write (Path.Combine(root,"results.json")) {|passed=passed;error=error;input=video;checks=checks.ToArray()|}
 try
-    reject "settings.relative-output" (fun()->run "saveSettings" ["outputDirectory","relative"] [||] |> ignore)
+    reject "settings.relative-output" (fun()->run "saveSettings" [("outputDirectory","relative")] [||] |> ignore)
     reject "settings.missing-tool" (fun()->run "saveSettings" ["outputDirectory",Path.Combine(root,"exports");"ffmpegPath",Path.Combine(root,"missing.exe")] [||] |> ignore)
     run "saveSettings" ["outputDirectory",Path.Combine(root,"exports");"ffmpegPath",ffmpeg;"whisperPath",whisper;"whisperModel",model] [||] |> ignore
-    run "setSize" ["cardSize","wide"] [||] |> ignore
+    run "setSize" [("cardSize","wide")] [||] |> ignore
     let reloaded=DesktopLibrary.Workspace(wr)
     require (reloaded.Snapshot().settings.CardSize="wide" && reloaded.Snapshot().settings.WhisperModel=model) "Settings did not survive reload"
     pass "settings.persistence" "Tool paths, model and card size persisted"
@@ -80,7 +80,7 @@ try
     run "transcribe" [] [||] |> ignore
     let transcript=first "transcript"
     require ((File.ReadAllText(transcript.Path)).Contains("-->")) "No timestamped ASR cues"
-    let preview=(run "readArtifact" ["artifactId",transcript.Id] [||]).data |> Option.map json |> Option.defaultWith(fun()->failwith "No transcript preview")
+    let preview=(run "readArtifact" [("artifactId",transcript.Id)] [||]).data |> Option.map json |> Option.defaultWith(fun()->failwith "No transcript preview")
     require (preview.GetString().Length>20) "Empty transcript preview"
     pass "transcript.local-asr" "Actual audio transcribed locally and previewed through Workspace"
     run "attachTranscript" [] [|transcript.Path|] |> ignore
@@ -171,7 +171,7 @@ try
         run "runbook" [] [||] |> ignore
         require (File.Exists((first "runbook").Path)) "Runbook export absent"
         let exported=Path.Combine(root,"atomic-library-export.json")
-        run "exportArtifact" ["artifactId",library.Id] [|exported|] |> ignore
+        run "exportArtifact" [("artifactId",library.Id)] [|exported|] |> ignore
         require (hash library.Path=hash exported) "Library export differs"
         pass "library.export" "Export preserves exact library bytes"
     let cardPath=Path.Combine(root,"video-card.json")
