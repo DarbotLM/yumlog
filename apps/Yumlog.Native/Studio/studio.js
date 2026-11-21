@@ -14,7 +14,8 @@ const backLabels = { video: "Video inputs and clips", screenshot: "Screenshot in
 const busyLabels = { import: "Opening recordings…", record: "Recording the desktop…", clip: "Exporting clip…",
   scenes: "Finding scene changes…", transcribe: "Transcribing audio locally…", bundle: "Building Paperboy bundle…",
   loadOcr: "Loading the Windows AI OCR model…", spectrogram: "Generating spectrogram…", decimate: "Processing the full recording: transcript, visual changes and semantic layers…", importAnalysis: "Verifying and importing analysis…", library: "Loading atomic library…", attachDocument: "Distilling document fields…",
-  detectAgentVoices: "Detecting speaker turns and exporting voice previews…", agentVoices: "Loading Agent Voices…" };
+  detectAgentVoices: "Detecting speaker turns and exporting voice previews…", agentVoices: "Loading Agent Voices…",
+  genAudioSpeak: "Rendering narration with gen-audio…", genAudioTranscribe: "Transcribing with gen-audio VibeVoice…" };
 
 let state = { videos: [], selectedId: "", tabs: [], artifacts: [], settings: { cardSize: "studio" }, paperboy: null };
 let active = "video";
@@ -136,7 +137,7 @@ async function run(command, payload = {}) {
     }
     if (command === "readArtifact") previews.set(payload.artifactId, reply.data || "");
     if (command === "saveSettings") {
-      for (const name of ["outputDirectory", "ffmpegPath", "whisperPath", "whisperModel"]) drafts.delete("settings:" + name);
+      for (const name of ["outputDirectory", "ffmpegPath", "whisperPath", "whisperModel", "genAudioPython", "genAudioRoot", "genAudioEngine", "genAudioVoice", "vibeVoiceModel"]) drafts.delete("settings:" + name);
     }
     render();
     status(reply.message || "Ready");
@@ -947,8 +948,10 @@ function renderPane() {
       actions.push(label("Transcript tools"),
         stack(act("Attach transcript", "attachTranscript", {}, { primary: true, enabled: !!item }),
           act("Extract embedded subtitles", "subtitles", {}, { enabled: hasSource && (item.media == null || item.media.subtitleStreams > 0) }),
-          act("Transcribe with Whisper", "transcribe", {}, { enabled: hasAudio && configured })));
+          act("Transcribe with Whisper", "transcribe", {}, { enabled: hasAudio && configured }),
+          act("Transcribe with gen-audio VibeVoice", "genAudioTranscribe", {}, { enabled: hasAudio && !!state.settings.vibeVoiceModel })));
       if (!configured) actions.push(hint("Add a whisper.cpp executable and model in Settings."));
+      if (!state.settings.vibeVoiceModel) actions.push(hint("Set a VibeVoice ASR checkpoint folder in Settings to transcribe with gen-audio."));
       break;
     }
     case "agents":
@@ -961,9 +964,17 @@ function renderPane() {
       const voice = field("Installed Windows voice", "voice", voices[0]?.name, { options: voices.map(item => item.name) });
       const script = field("Narration script", "script", "", { type: "textarea" });
       script.input.maxLength = 10000;
+      const genAudioReady = !!state.settings.genAudioVoice;
       actions.push(label("Script narration"), stack(act("List installed voices", "voices")));
-      if (voices.length) actions.push(voice.wrapper, script.wrapper, stack(act("Render WAV narration", "speak",
-        () => ({ voice: voice.value(), script: script.value() }), { primary: true, enabled: !!item })));
+      if (voices.length) actions.push(voice.wrapper);
+      actions.push(script.wrapper);
+      const renders = [];
+      if (voices.length) renders.push(act("Render WAV narration", "speak",
+        () => ({ voice: voice.value(), script: script.value() }), { primary: true, enabled: !!item }));
+      renders.push(act("Render with gen-audio", "genAudioSpeak", () => ({ script: script.value() }),
+        { primary: !voices.length, enabled: !!item && genAudioReady }));
+      actions.push(stack(...renders));
+      if (!genAudioReady) actions.push(hint("Set a gen-audio voice in Settings to narrate with gen-audio engines such as Kokoro."));
       if (!item) actions.push(hint("Open a recording to save narration to its card."));
       break;
     }
@@ -1002,10 +1013,13 @@ function renderPane() {
       break;
     case "settings": {
       const labels = { outputDirectory: "Output directory", ffmpegPath: "FFmpeg executable",
-        whisperPath: "whisper.cpp executable", whisperModel: "Whisper model file" };
+        whisperPath: "whisper.cpp executable", whisperModel: "Whisper model file",
+        genAudioPython: "gen-audio Python executable", genAudioRoot: "gen-audio checkout folder (optional)",
+        genAudioEngine: "gen-audio engine (default kokoro_onnx)", genAudioVoice: "gen-audio voice",
+        vibeVoiceModel: "VibeVoice ASR checkpoint folder" };
       const fields = Object.entries(labels).map(([key, title]) => [key, field(title, key, state.settings[key] || "")]);
       actions.push(label("Local tools"), ...fields.map(([, value]) => value.wrapper),
-        hint("Leave FFmpeg blank to use Yumlog’s existing configuration or PATH."),
+        hint("Leave FFmpeg blank to use Yumlog’s existing configuration or PATH. Leave gen-audio fields blank to use GEN_AUDIO_PYTHON, GEN_AUDIO_ROOT, GEN_AUDIO_VIBEVOICE_ASR_MODEL and the YUMLOG_GEN_AUDIO_* variables."),
         stack(act("Save settings", "saveSettings", () => Object.fromEntries(fields.map(([key, value]) => [key, value.value()])), { primary: true })));
       break;
     }

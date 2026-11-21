@@ -98,6 +98,27 @@ module Program =
                 verification.MismatchedProofs
 
             if verification.Verified then 0 else 2
+        | Speak options ->
+            let get key = options |> Map.tryFind key |> Option.defaultValue ""
+            let script = if options.ContainsKey "text-file" then File.ReadAllText(get "text-file") else get "text"
+            let settings =
+                { GenAudio.defaults with
+                    Python = get "python"; Root = get "gen-audio-root"; Engine = get "engine"
+                    Voice = get "voice"; Language = get "language" }
+            let receipt = GenAudio.renderSpeech settings script (get "out-file")
+            if get "json-out" = "" then writeJson receipt else writeJsonFile (get "json-out") receipt
+            0
+        | Transcribe options ->
+            let get key = options |> Map.tryFind key |> Option.defaultValue ""
+            let settings =
+                { GenAudio.defaults with
+                    Python = get "python"; Root = get "gen-audio-root"; VibeVoiceModel = get "model"; Device = get "device" }
+            let receipt = GenAudio.transcribe settings (get "input")
+            if get "srt-out" <> "" then
+                File.WriteAllText(get "srt-out", GenAudio.toSrt receipt)
+                eprintfn "Wrote %s" (Path.GetFullPath(get "srt-out"))
+            if get "json-out" = "" then writeJson receipt else writeJsonFile (get "json-out") receipt
+            0
         | ListModels ->
             let models = OnDeviceLlm.discoverAll()
 
@@ -184,6 +205,8 @@ module Program =
         match command with
         | Reason _
         | Watch _
+        | Speak _
+        | Transcribe _
         | ListModels
         | Handoff _
         | Readiness _
@@ -210,6 +233,7 @@ module Program =
             shutdown ()
             exitCode
         with ex ->
+            ChildProcesses.killAll ()
             shutdown ()
             // Always name the exception type - a bare "Object reference not set to an
             // instance of an object." is undiagnosable. Full stack behind YUMLOG_DEBUG=1.

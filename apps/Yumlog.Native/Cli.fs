@@ -34,6 +34,14 @@ Usage:
                           [--model dir] [--provider cpu|auto] [--high-water 0..1]
                           [--max-tokens n] [--json-out path]
   Yumlog.Native.Cli models
+  Yumlog.Native.Cli speak (--text text | --text-file path) --out-file path.wav [--engine id] [--voice id]
+                          [--language code] [--python path] [--gen-audio-root dir] [--json-out path]
+  Yumlog.Native.Cli transcribe --input audio.wav [--model vibevoice-asr-dir] [--device cpu|cuda]
+                               [--srt-out path] [--json-out path] [--python path] [--gen-audio-root dir]
+
+gen-audio (speak, transcribe):
+  Runs darbotlabs/gen-audio's CLIs through Python. Defaults come from GEN_AUDIO_PYTHON, GEN_AUDIO_ROOT,
+  YUMLOG_GEN_AUDIO_ENGINE (kokoro_onnx), YUMLOG_GEN_AUDIO_VOICE and GEN_AUDIO_VIBEVOICE_ASR_MODEL.
 
   Yumlog.Native.Cli handoff --input path --out-dir path [--ocr none|auto|windows-ai|raw-com] [--resume]
   Yumlog.Native.Cli readiness --ocr none|auto|windows-ai|raw-com
@@ -191,6 +199,17 @@ Extension kinds:
             let jsonOut = options |> Map.tryFind "json-out" |> Option.defaultValue ""
             let markdownOut = options |> Map.tryFind "markdown-out" |> Option.defaultValue ""
             Runbook(input, jsonOut, markdownOut)
+        | "speak" :: args ->
+            let _, options = parseOptions args
+            ensureOptions "speak" [ "text"; "text-file"; "out-file"; "engine"; "voice"; "language"; "python"; "gen-audio-root"; "json-out" ] options
+            if not (options.ContainsKey "out-file") then invalidArg "out-file" "Missing --out-file path for the WAV."
+            if options.ContainsKey "text" = options.ContainsKey "text-file" then invalidArg "text" "Pass exactly one of --text or --text-file."
+            Speak options
+        | "transcribe" :: args ->
+            let _, options = parseOptions args
+            ensureOptions "transcribe" [ "input"; "model"; "device"; "srt-out"; "json-out"; "python"; "gen-audio-root" ] options
+            if not (options.ContainsKey "input") then invalidArg "input" "Missing --input path to a WAV file."
+            Transcribe options
         | "models" :: args ->
             let configPath, options = parseOptions args
             ensureOptions "models" [] options

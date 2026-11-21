@@ -159,6 +159,7 @@ function Invoke-Gate {
             .\launchers\Test-YumlogNativeHandoff.ps1 -Configuration Release
         }
         Invoke-Checked 'Agent client protocol' { .\launchers\Test-YumlogAgentProtocol.ps1 -DotnetPath dotnet }
+        Invoke-Checked 'gen-audio boundary' { .\launchers\Test-YumlogGenAudio.ps1 }
         Invoke-Checked 'Media presets' { dotnet fsi .\launchers\test-media-presets.fsx }
         Invoke-Checked 'Studio smoke' {
             $smoke = Join-Path $repo 'dist\StudioSmoke-toolbox'

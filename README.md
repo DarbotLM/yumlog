@@ -553,6 +553,8 @@ capture readiness and are not release gates.
 | `reason` | Answer a question about a recording with an on-device model |
 | `watch` | Observe the live screen and narrate on an interval |
 | `models` | List installed on-device models |
+| `speak` | Render narration through gen-audio (`render_speech`) and verify its receipt |
+| `transcribe` | Transcribe a WAV with gen-audio VibeVoice ASR into a receipt and optional SRT |
 | `selftest` | Run the 17-check built-in correctness suite |
 | `config show` / `config init` | Inspect or scaffold native config |
 
