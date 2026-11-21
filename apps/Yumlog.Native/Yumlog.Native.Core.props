@@ -23,6 +23,7 @@
   <ItemGroup>
     <EmbeddedResource Include="$(YumlogNativeDir)..\..\config\media-presets.json" LogicalName="Yumlog.MediaPresets.json" />
     <Compile Include="$(YumlogNativeDir)Domain.fs" Link="Domain.fs" />
+    <Compile Include="$(YumlogNativeDir)ChildProcesses.fs" Link="ChildProcesses.fs" />
     <Compile Include="$(YumlogNativeDir)Json.fs" Link="Json.fs" />
     <Compile Include="$(YumlogNativeDir)Mdkg.fs" Link="Mdkg.fs" />
     <Compile Include="$(YumlogNativeDir)MdkgIntel.fs" Link="MdkgIntel.fs" />

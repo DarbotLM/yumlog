@@ -128,6 +128,7 @@ module NativeOrchestration =
 
         if not (proc.Start()) then
             failwith $"Could not start orchestration step '{step.Name}'."
+        use _tracked = ChildProcesses.track proc
 
         proc.BeginOutputReadLine()
         proc.BeginErrorReadLine()

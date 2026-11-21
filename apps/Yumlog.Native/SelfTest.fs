@@ -463,8 +463,31 @@ module NativeSelfTest =
 
         [| check "probe.nvenc.driverDll" true (if nvenc then "nvEncodeAPI64.dll present" else "nvEncodeAPI64.dll not found; NVENC backend unavailable") |]
 
+    let private childCleanup () =
+        // Studio must never leave helper processes behind: a tracked child (and
+        // its descendants) has to die when the shell calls killAll().
+        let passed, detail =
+            try
+                let systemRoot =
+                    match Environment.GetEnvironmentVariable("SystemRoot") with
+                    | null -> @"C:\Windows"
+                    | root -> root
+                let info = Diagnostics.ProcessStartInfo(Path.Combine(systemRoot, "System32", "cmd.exe"), "/d /c ping -n 30 127.0.0.1 >nul",
+                                                        UseShellExecute = false, CreateNoWindow = true)
+                use child = new Diagnostics.Process(StartInfo = info)
+                child.Start() |> ignore
+                let tracked = ChildProcesses.track child
+                ChildProcesses.killAll ()
+                let exited = child.WaitForExit(5000)
+                tracked.Dispose()
+                let remaining = ChildProcesses.count ()
+                exited && remaining = 0, $"tracked child exited={exited}, registry remaining={remaining}"
+            with error ->
+                false, error.Message
+        [| check "process.children.killedOnExit" passed detail |]
+
     let run (sampleOut: string) =
-        let cases = Array.append (mdkgRoundTrip sampleOut) (encoderProbe ())
+        let cases = Array.concat [ mdkgRoundTrip sampleOut; encoderProbe (); childCleanup () ]
         let failed = cases |> Array.filter (fun case -> not case.Passed)
 
         { Passed = failed.Length = 0

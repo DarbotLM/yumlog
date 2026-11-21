@@ -195,6 +195,8 @@ module NativeUi =
                             busy <- false
                 } |> ignore
 
+        form.FormClosed.Add(fun _ -> ChildProcesses.killAll())
+
         form.FormClosing.Add(fun event ->
             if busy && event.CloseReason = CloseReason.UserClosing then
                 event.Cancel <- true

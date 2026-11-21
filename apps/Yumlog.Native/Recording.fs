@@ -106,6 +106,7 @@ module NativeRecording =
 
         if not (proc.Start()) then
             failwith "FFmpeg process did not start."
+        use _tracked = ChildProcesses.track proc
 
         proc.BeginErrorReadLine()
         let timeoutMs = (max 1 config.DurationSec + 30) * 1000

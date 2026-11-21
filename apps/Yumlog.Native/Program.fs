@@ -14,12 +14,15 @@ module Program =
             |> ignore
             0
         else
+            AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> ChildProcesses.killAll())
             try
                 WinAppRuntime.tryInitialize() |> ignore
                 NativeUi.run()
+                ChildProcesses.killAll()
                 WinAppRuntime.shutdown()
                 0
             with ex ->
+                ChildProcesses.killAll()
                 WinAppRuntime.shutdown()
                 MessageBox.Show(ex.Message, "Yumlog Native could not start", MessageBoxButtons.OK, MessageBoxIcon.Error)
                 |> ignore

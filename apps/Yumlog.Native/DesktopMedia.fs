@@ -30,6 +30,7 @@ module DesktopMedia =
             info.ArgumentList.Add(argument)
         use child = new Process(StartInfo = info)
         if not (child.Start()) then invalidOp $"Could not start {executable}."
+        use _tracked = ChildProcesses.track child
         let output = child.StandardOutput.ReadToEndAsync()
         let errors = child.StandardError.ReadToEndAsync()
         if not (child.WaitForExit(timeout)) then
