@@ -3,6 +3,7 @@ param(
     [string]$BaseUrl = 'http://127.0.0.1:5117',
     [string]$Endpoint = 'http://127.0.0.1:52495/v1',
     [int]$TimeoutSec = 30,
+    [ValidateRange(1, 86400)][int]$TagTimeoutSec = 21600,
     [string]$TagPath = '',
     [string]$Model = '',
     [string]$ReportPath = '',
@@ -133,6 +134,7 @@ try {
         $tagResult = Invoke-RestMethod `
             -Method Post `
             -Uri "$BaseUrl/api/tag" `
+            -TimeoutSec $TagTimeoutSec `
             -ContentType 'application/json' `
             -Body (@{
                 sourcePaths = @($TagPath)
