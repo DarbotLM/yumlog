@@ -223,8 +223,8 @@ $exe = ".\apps\Yumlog.Native.Cli\bin\Release\net10.0-windows10.0.26100.0\win-x64
 > `--timed-metadata-out` is what makes a recording answerable. Without it you get
 > video only, and `runbook` and `reason` have nothing to read.
 
-> Unknown arguments are currently ignored silently. A typo such as `--output`
-> instead of `--out-file` exits 0 and writes nothing.
+> Unknown options are rejected. A typo such as `--output` instead of `--out-file`
+> fails with `Unknown option(s) for record: --output` and a non-zero exit code.
 
 #### Verifiable runbooks
 
@@ -255,7 +255,7 @@ assembled and why runbook proofs are *not* visible to the model.
 
 #### Built-in correctness suite
 
-`selftest` runs 16 checks across the MDKG container, the intelligence layer, and
+`selftest` runs 17 checks across the MDKG container, the intelligence layer, and
 hardware probes, and returns JSON with keys `passed`, `passedCount`,
 `failedCount`, and `cases`. `mdkg.timing.coverageNoOverlap` ships with a negative
 control so it cannot pass vacuously.
@@ -553,7 +553,7 @@ capture readiness and are not release gates.
 | `reason` | Answer a question about a recording with an on-device model |
 | `watch` | Observe the live screen and narrate on an interval |
 | `models` | List installed on-device models |
-| `selftest` | Run the 16-check built-in correctness suite |
+| `selftest` | Run the 17-check built-in correctness suite |
 | `config show` / `config init` | Inspect or scaffold native config |
 
 Full flags in [`docs/NATIVE-CLI.md`](docs/NATIVE-CLI.md).
