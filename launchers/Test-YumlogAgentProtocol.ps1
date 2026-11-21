@@ -4,6 +4,8 @@ param(
     [string]$Endpoint = 'http://127.0.0.1:52495/v1',
     [int]$TimeoutSec = 30,
     [ValidateRange(1, 86400)][int]$TagTimeoutSec = 21600,
+    [ValidateRange(1, 500)][int]$TagBatchSize = 25,
+    [ValidateRange(0, 10000)][int]$RecycleFoundryEvery = 0,
     [string]$TagPath = '',
     [string]$Model = '',
     [string]$ReportPath = '',
@@ -131,22 +133,6 @@ try {
 
     $tagResult = $null
     if ($TagPath -and $Model) {
-        $tagResult = Invoke-RestMethod `
-            -Method Post `
-            -Uri "$BaseUrl/api/tag" `
-            -TimeoutSec $TagTimeoutSec `
-            -ContentType 'application/json' `
-            -Body (@{
-                sourcePaths = @($TagPath)
-                model = $Model
-                endpoint = $Endpoint
-                includeImageContent = $true
-                sampleVideoFrames = $true
-            } | ConvertTo-Json -Compress)
-        if ($tagResult.error -or $tagResult.result.isError) {
-            $detail = if ($tagResult.error) { $tagResult.error.message } else { $tagResult.result.content[0].text }
-            throw "Tagging pipeline failed: $detail"
-        }
         if (-not $ReportPath) {
             $reportDirectory = Join-Path $repoRoot 'dist\tagging-reports'
             New-Item -ItemType Directory -Path $reportDirectory -Force | Out-Null
@@ -154,7 +140,114 @@ try {
         }
         $ReportPath = [IO.Path]::GetFullPath($ReportPath)
         New-Item -ItemType Directory -Path (Split-Path -Parent $ReportPath) -Force | Out-Null
-        $tagResult | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $ReportPath -Encoding UTF8
+        $supportedExtensions = @(
+            '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp',
+            '.mp4', '.mov', '.mkv', '.avi', '.webm',
+            '.mp3', '.wav', '.m4a', '.flac', '.aac',
+            '.txt', '.md', '.json', '.csv', '.log'
+        )
+        $sourceFiles = if (Test-Path -LiteralPath $resolvedTagPath -PathType Container) {
+            @(Get-ChildItem -LiteralPath $resolvedTagPath -Recurse -File |
+                Where-Object { $supportedExtensions -contains $_.Extension.ToLowerInvariant() } |
+                Sort-Object FullName | ForEach-Object FullName)
+        } else {
+            @($resolvedTagPath)
+        }
+        $tagFiles = @()
+        $tagErrors = @()
+        if (Test-Path -LiteralPath $ReportPath -PathType Leaf) {
+            $checkpoint = Get-Content -LiteralPath $ReportPath -Raw | ConvertFrom-Json
+            if ($checkpoint.schema -eq 'urn:yumlog:tagging-checkpoint:v1' -and
+                [string]::Equals($checkpoint.sourcePath, $resolvedTagPath, [StringComparison]::OrdinalIgnoreCase)) {
+                $tagFiles = @($checkpoint.files)
+                $tagErrors = @($checkpoint.errors)
+            }
+        }
+        $completed = @{}
+        foreach ($file in $tagFiles) { $completed[$file.path] = $true }
+        $pending = @($sourceFiles | Where-Object { -not $completed.ContainsKey($_) })
+        $startedUtc = [DateTimeOffset]::UtcNow
+        $sinceRecycle = 0
+
+        function Save-TagCheckpoint([bool]$Complete) {
+            $checkpoint = [ordered]@{
+                schema = 'urn:yumlog:tagging-checkpoint:v1'
+                sourcePath = $resolvedTagPath
+                endpoint = $Endpoint
+                model = $Model
+                startedUtc = $startedUtc
+                updatedUtc = [DateTimeOffset]::UtcNow
+                expectedFiles = $sourceFiles.Count
+                complete = $Complete
+                files = $tagFiles
+                errors = $tagErrors
+            }
+            $temporary = $ReportPath + '.tmp'
+            $checkpoint | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $temporary -Encoding UTF8
+            Move-Item -LiteralPath $temporary -Destination $ReportPath -Force
+        }
+
+        function Invoke-TagBatch([string[]]$Paths) {
+            $response = Invoke-RestMethod `
+                -Method Post `
+                -Uri "$BaseUrl/api/tag" `
+                -TimeoutSec $TagTimeoutSec `
+                -ContentType 'application/json' `
+                -Body (@{
+                    sourcePaths = $Paths
+                    model = $Model
+                    endpoint = $Endpoint
+                    includeImageContent = $true
+                    sampleVideoFrames = $true
+                } | ConvertTo-Json -Compress)
+            if ($response.error -or $response.result.isError) {
+                $detail = if ($response.error) { $response.error.message } else { $response.result.content[0].text }
+                throw "Tagging batch failed: $detail"
+            }
+            $payload = $response.result.content[0].text | ConvertFrom-Json
+            return @($payload.result.files)
+        }
+
+        Save-TagCheckpoint $false
+        for ($offset = 0; $offset -lt $pending.Count; $offset += $TagBatchSize) {
+            $count = [Math]::Min($TagBatchSize, $pending.Count - $offset)
+            $batch = @($pending[$offset..($offset + $count - 1)])
+            try {
+                $results = @(Invoke-TagBatch $batch)
+                $tagFiles += $results
+            } catch {
+                Write-Warning "Batch failed; isolating $($batch.Count) files: $($_.Exception.Message)"
+                foreach ($path in $batch) {
+                    try {
+                        $tagFiles += @(Invoke-TagBatch @($path))
+                    } catch {
+                        $tagErrors += [pscustomobject]@{
+                            path = $path
+                            error = $_.Exception.Message
+                            failedUtc = [DateTimeOffset]::UtcNow
+                        }
+                    }
+                }
+            }
+            Save-TagCheckpoint $false
+            $processed = [Math]::Min($pending.Count, $offset + $TagBatchSize)
+            Write-Host "Tagging checkpoint: $processed/$($pending.Count) new files, $($tagFiles.Count)/$($sourceFiles.Count) complete."
+            $sinceRecycle += $count
+            if ($RecycleFoundryEvery -gt 0 -and $sinceRecycle -ge $RecycleFoundryEvery) {
+                $foundry = Get-Command foundry -ErrorAction Stop
+                & $foundry.Source model unload $Model
+                if ($LASTEXITCODE -ne 0) { throw "Foundry model unload failed with exit code $LASTEXITCODE." }
+                & $foundry.Source model load $Model
+                if ($LASTEXITCODE -ne 0) { throw "Foundry model load failed with exit code $LASTEXITCODE." }
+                $sinceRecycle = 0
+            }
+        }
+        Save-TagCheckpoint $true
+        $tagResult = [pscustomobject]@{
+            files = $tagFiles
+            errors = $tagErrors
+            complete = $true
+        }
     }
 
     [pscustomobject]@{
@@ -164,7 +257,8 @@ try {
         StreamableSse = $true
         AgentPlugin = $plugin.schema_version
         TaggingExecuted = $null -ne $tagResult
-        TaggedFiles = if ($tagResult) { @($tagResult.result.content[0].text | ConvertFrom-Json | ForEach-Object { $_.result.files }).Count } else { 0 }
+        TaggedFiles = if ($tagResult) { @($tagResult.files).Count } else { 0 }
+        FailedFiles = if ($tagResult) { @($tagResult.errors).Count } else { 0 }
         ReportPath = if ($ReportPath) { $ReportPath } else { $null }
     }
 } finally {
