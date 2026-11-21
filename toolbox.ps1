@@ -128,9 +128,9 @@ function Invoke-Uprev {
     Update-File 'apps\Yumlog.NpuEmulator\src-tauri\Cargo.toml' { param($t) [regex]::Replace($t, "(?m)^version = `"$o`"", "version = `"$new`"", 1) }
     Update-File 'apps\Yumlog.NpuEmulator\src-tauri\Cargo.lock' { param($t) [regex]::Replace($t, "(name = `"yumlog-npu-emulator`"\r?\nversion = `")$o`"", "`${1}$new`"") }
     Update-File 'apps\Yumlog.NpuEmulator\src-tauri\tauri.conf.json' { param($t) [regex]::Replace($t, "(`"version`": `")$o`"", "`${1}$new`"", 1) }
-    foreach ($script in 'launchers\Build-YumlogProduction.ps1', 'launchers\Install-YumlogProduction.ps1', 'launchers\Test-YumlogProductionPackage.ps1') {
-        Update-File $script { param($t) $t.Replace("'$old'", "'$new'").Replace("Yumlog-$old", "Yumlog-$new").Replace(" $old.lnk", " $new.lnk") }
-    }
+    # Package, archive and shortcut names come from launchers\Get-YumlogVersion.ps1, so the launchers need no edit.
+    Update-File 'apps\Yumlog.Native\EXTENSIBILITY.md' { param($t) $t.Replace("``$old.0``", "``$new.0``") }
+    Update-File 'apps\Paperboy.Desktop\README.md' { param($t) $t.Replace("**$old**", "**$new**") }
     $left = git -C $repo grep -n -F $old -- 'apps/*.csproj' 'apps/*.fsproj' 'launchers/*Production*.ps1' 'apps/Yumlog.Native/Package.appxmanifest'
     if ($left) { throw "Uprev left old version references:`n$($left -join "`n")" }
     Write-Log "   version is now $new"

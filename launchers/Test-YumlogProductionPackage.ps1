@@ -1,13 +1,20 @@
 [CmdletBinding()]
 param(
-    [string]$PackagePath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist\Yumlog-0.6.0\package'),
+    [string]$PackagePath,
+    [string]$ExpectedVersion,
     [string]$InstallRoot = (Join-Path ([IO.Path]::GetTempPath()) ("yumlog-package-smoke-" + [Guid]::NewGuid().ToString('N')))
 )
 
 $ErrorActionPreference = 'Stop'
+$repoVersion = & (Join-Path $PSScriptRoot 'Get-YumlogVersion.ps1')
+if (-not $ExpectedVersion) { $ExpectedVersion = $repoVersion }
+if (-not $PackagePath) {
+    if (-not $repoVersion) { throw 'Pass -PackagePath when running outside a Yumlog checkout.' }
+    $PackagePath = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path "dist\Yumlog-$repoVersion\package"
+}
 $manifestPath = Join-Path $PackagePath 'release-manifest.json'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.version -ne '0.6.0') {
+if ($manifest.version -notmatch '^\d+\.\d+\.\d+$' -or ($ExpectedVersion -and $manifest.version -ne $ExpectedVersion)) {
     throw "Unexpected package version: $($manifest.version)"
 }
 
