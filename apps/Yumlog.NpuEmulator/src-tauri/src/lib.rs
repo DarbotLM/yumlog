@@ -333,6 +333,7 @@ fn recognize_text(
 
 pub fn run() {
     tauri::Builder::default()
+        .runtime(tauri_runtime_cef::Cef::default())
         .manage(Mutex::new(EmulatorRuntime::new()))
         .invoke_handler(tauri::generate_handler![
             get_features,

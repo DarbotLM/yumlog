@@ -14,6 +14,9 @@ if (-not $SkipBuild) {
  if ($LASTEXITCODE -ne 0) { throw 'Studio build failed.' }
 }
 $bin=Join-Path $repo "apps\Yumlog.Native\bin\$Configuration\net10.0-windows10.0.26100.0\win-x64"
+if (-not (Test-Path -LiteralPath (Join-Path $bin 'Yumlog.Native.dll'))) {
+    throw "Studio build did not produce Yumlog.Native.dll at $bin. Run without -SkipBuild."
+}
 $desktop=Get-ChildItem 'C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App' -Directory | Where-Object Name -Like '10.*' | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
 $script=[IO.File]::ReadAllText((Join-Path $PSScriptRoot 'YumlogStudioIntegration.fsx'))
 $script=$script.Replace('__DLL__',(Join-Path $bin 'Yumlog.Native.dll')).Replace('__SPEECH__',(Join-Path $bin 'System.Speech.dll')).Replace('__DRAWING__',(Join-Path $desktop.FullName 'System.Drawing.Common.dll')).Replace('__WINDOWS__',(Join-Path $bin 'Microsoft.Windows.SDK.NET.dll')).Replace('__WINRT__',(Join-Path $bin 'WinRT.Runtime.dll')).Replace('__OUTPUT__',$OutputRoot).Replace('__REPO__',$repo).Replace('__VIDEO__',$InputVideo).Replace('__SKIP__',([bool]$SkipDecimation).ToString().ToLowerInvariant())

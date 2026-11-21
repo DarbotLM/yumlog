@@ -1,9 +1,11 @@
 [CmdletBinding()]
 param(
     [string]$BaseUrl = 'http://127.0.0.1:5117',
+    [string]$Endpoint = 'http://127.0.0.1:52495/v1',
     [int]$TimeoutSec = 30,
     [string]$TagPath = '',
     [string]$Model = '',
+    [string]$ReportPath = '',
     [string]$DotnetPath = 'dotnet'
 )
 
@@ -17,6 +19,11 @@ if ($LASTEXITCODE -ne 0) {
 
 $dll = Join-Path $repoRoot 'apps\Paperboy.Mcp\bin\Release\net11.0-windows\Paperboy.Mcp.dll'
 $allowedRoot = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Yumlog Native'
+$allowedRoots = @($allowedRoot)
+if ($TagPath) {
+    $resolvedTagPath = (Resolve-Path -LiteralPath $TagPath -ErrorAction Stop).Path
+    $allowedRoots += $resolvedTagPath
+}
 $previousAllowed = $env:YUMLOG_AGENT_ALLOWED_ROOTS
 $process = $null
 
@@ -30,7 +37,7 @@ function Invoke-Mcp([object]$Message) {
 }
 
 try {
-    $env:YUMLOG_AGENT_ALLOWED_ROOTS = $allowedRoot
+    $env:YUMLOG_AGENT_ALLOWED_ROOTS = $allowedRoots -join ';'
     $process = Start-Process -FilePath $DotnetPath -ArgumentList @(
         "`"$dll`"",
         '--http',
@@ -130,9 +137,22 @@ try {
             -Body (@{
                 sourcePaths = @($TagPath)
                 model = $Model
+                endpoint = $Endpoint
                 includeImageContent = $true
                 sampleVideoFrames = $true
             } | ConvertTo-Json -Compress)
+        if ($tagResult.error -or $tagResult.result.isError) {
+            $detail = if ($tagResult.error) { $tagResult.error.message } else { $tagResult.result.content[0].text }
+            throw "Tagging pipeline failed: $detail"
+        }
+        if (-not $ReportPath) {
+            $reportDirectory = Join-Path $repoRoot 'dist\tagging-reports'
+            New-Item -ItemType Directory -Path $reportDirectory -Force | Out-Null
+            $ReportPath = Join-Path $reportDirectory ('paperboy-tagging-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.json')
+        }
+        $ReportPath = [IO.Path]::GetFullPath($ReportPath)
+        New-Item -ItemType Directory -Path (Split-Path -Parent $ReportPath) -Force | Out-Null
+        $tagResult | ConvertTo-Json -Depth 30 | Set-Content -LiteralPath $ReportPath -Encoding UTF8
     }
 
     [pscustomobject]@{
@@ -142,12 +162,14 @@ try {
         StreamableSse = $true
         AgentPlugin = $plugin.schema_version
         TaggingExecuted = $null -ne $tagResult
+        TaggedFiles = if ($tagResult) { @($tagResult.result.content[0].text | ConvertFrom-Json | ForEach-Object { $_.result.files }).Count } else { 0 }
+        ReportPath = if ($ReportPath) { $ReportPath } else { $null }
     }
 } finally {
     if ($null -ne $process) {
         if (-not $process.HasExited) {
             $process.Kill($true)
-            $process.WaitForExit(5000)
+            $process.WaitForExit(5000) | Out-Null
         }
         $process.Dispose()
     }

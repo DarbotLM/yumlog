@@ -55,7 +55,8 @@ module NativeConfig =
               FFmpegPath = ""
               Encoder = "hevc"
               Preset = "medium"
-              Backend = "auto"
+              // FFmpeg is the default media backend until the Yumlog codec ships.
+              Backend = "ffmpeg"
               Codec = "hevc"
               Lossless = true
               Container = "mp4"
@@ -143,8 +144,7 @@ module NativeConfig =
         /// accepts the legacy FFmpeg pipeline, which is not an in-process encoder.
         let normalizeRecordBackend (value: string) =
             match (orEmptyIfNull value).Trim().ToLowerInvariant() with
-            | "" -> "auto"
-            | "ffmpeg" | "legacy" -> "ffmpeg"
+            | "" | "ffmpeg" | "legacy" -> "ffmpeg"
             | _ -> value |> HevcBackend.parse |> HevcBackend.toString
 
         let normalizeContainer (value: string) =

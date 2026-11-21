@@ -75,6 +75,11 @@
     </ItemGroup>
   </Target>
 
+  <Target Name="VerifyNativeDesktopOutputs" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error Condition="!Exists('$(TargetPath)')" Text="Yumlog Native desktop assembly is missing: $(TargetPath)." />
+    <Error Condition="!Exists('$(TargetDir)$(AssemblyName).exe')" Text="Yumlog Native desktop executable is missing: $(TargetDir)$(AssemblyName).exe." />
+  </Target>
+
   <Target Name="PackageMsix" DependsOnTargets="Build">
     <Error Condition="!Exists('$(YumlogMakeAppx)')" Text="makeappx.exe was not found at '$(YumlogMakeAppx)'. Set /p:YumlogMakeAppx=&lt;path&gt; to override." />
 
@@ -97,6 +102,9 @@
       SourceFiles="@(YumlogNativeCliPayload)"
       DestinationFiles="@(YumlogNativeCliPayload->'$(YumlogNativePackageLayout)\%(RecursiveDir)%(Filename)%(Extension)')"
       SkipUnchangedFiles="false" />
+
+    <Error Condition="!Exists('$(YumlogNativePackageLayout)\Yumlog.Native.dll')" Text="MSIX layout is missing Yumlog.Native.dll." />
+    <Error Condition="!Exists('$(YumlogNativePackageLayout)\Yumlog.Native.exe')" Text="MSIX layout is missing Yumlog.Native.exe." />
 
     <Copy
       SourceFiles="$(MSBuildProjectDirectory)\Package.appxmanifest"

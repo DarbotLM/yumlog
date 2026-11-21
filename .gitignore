@@ -84,3 +84,6 @@ clippyclaw-validation-*/
 
 # Local speech models (large, fetched by launchers/Install-YumlogVoiceTools.ps1)
 .tools/whisper/
+
+# Studio smoke harness manifest (other package.json files stay ignored)
+!qa/studio-smoke/package.json

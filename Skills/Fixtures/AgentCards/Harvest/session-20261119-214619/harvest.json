@@ -1,0 +1,14 @@
+{
+  "createdUtc": "2026-11-19T21:46:19.8478035+00:00",
+  "files": [
+    {
+      "bytes": 7566363,
+      "lastWriteTimeUtc": "2026-11-19T20:11:28.2506999Z",
+      "path": "yumlog-v050-review.mp4",
+      "sha256": "cfdd05f094427dc06d40d39ebaf93ec158832cc7c36134e32f342d55fd62e08f"
+    }
+  ],
+  "schema": "urn:yumlog:harvest:v1",
+  "schemaVersion": "1.0",
+  "sessionId": "853d3f07-014d-48f8-a353-0ea7b069f588"
+}

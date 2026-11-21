@@ -1,0 +1,98 @@
+{
+  "$schema": "https://darbotlabs.github.io/yumlog/paperboy.video-agent-card.schema.json",
+  "actions": [
+    "open",
+    "flip",
+    "buildTranscript",
+    "extractAudio",
+    "harvest",
+    "inspectMdkg"
+  ],
+  "adaptiveSizes": [
+    {
+      "cardsPerViewport": 8,
+      "height": 165,
+      "name": "small",
+      "width": 220
+    },
+    {
+      "cardsPerViewport": 4,
+      "height": 270,
+      "name": "medium",
+      "width": 360
+    },
+    {
+      "cardsPerViewport": 2,
+      "height": 540,
+      "name": "large",
+      "width": 720
+    },
+    {
+      "cardsPerViewport": 1,
+      "height": 810,
+      "name": "presentation",
+      "width": 1080
+    }
+  ],
+  "description": "Adaptive Yumlog video evidence card with a front preview shell and inspectable metadata back.",
+  "id": "paperboy.video.yumlog-v050-review",
+  "inputs": [
+    "mp4",
+    "mdkg",
+    "durationSec",
+    "fps",
+    "monitor"
+  ],
+  "liveTileState": "ready",
+  "media": {
+    "bytes": 7566363,
+    "fileName": "yumlog-v050-review.mp4",
+    "kind": "video",
+    "lastWriteTimeUtc": "2026-11-19T20:11:28.2506999Z",
+    "mdkgPath": "",
+    "mdkgSha256": "",
+    "path": "yumlog-v050-review.mp4",
+    "sha256": "cfdd05f094427dc06d40d39ebaf93ec158832cc7c36134e32f342d55fd62e08f"
+  },
+  "outputs": [
+    "videoCard",
+    "preview",
+    "citations",
+    "sha256",
+    "harvestManifest"
+  ],
+  "provenance": {
+    "generatedUtc": "2026-11-19T21:46:19.7793717+00:00",
+    "localOnly": true,
+    "producer": "Yumlog.Native",
+    "verification": "sha256 and MDKG proof verification on request",
+    "version": "0.5.0"
+  },
+  "role": "video-evidence",
+  "schemaVersion": "1.0",
+  "shell": {
+    "accent": "#a3e4ce",
+    "aspectRatio": "4:3",
+    "back": [
+      "description",
+      "inputs",
+      "outputs",
+      "actions",
+      "provenance"
+    ],
+    "background": "#080c10",
+    "baseHeight": 540,
+    "baseWidth": 720,
+    "borderColor": "#344b4f",
+    "flip": "rotateY(180deg)",
+    "front": [
+      "preview",
+      "title",
+      "status",
+      "duration",
+      "actions"
+    ],
+    "radius": 20
+  },
+  "title": "yumlog-v050-review.mp4"
+}

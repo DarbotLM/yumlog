@@ -1,0 +1,8 @@
+{
+  "name": "yumlog-studio-smoke",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright-core": "^1.58.0"
+  }
+}

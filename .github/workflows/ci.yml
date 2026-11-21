@@ -30,7 +30,10 @@ jobs:
       - name: Build Paperboy MCP app
         run: dotnet build .\apps\Paperboy.Mcp\Paperboy.Mcp.csproj -c Release
       - name: Build native desktop app
-        run: dotnet build .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release
+        run: |
+          dotnet build .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release
+          $native = ".\apps\Yumlog.Native\bin\Release\net10.0-windows10.0.26100.0\win-x64"
+          if (-not (Test-Path "$native\Yumlog.Native.dll") -or -not (Test-Path "$native\Yumlog.Native.exe")) { throw "Native desktop build outputs are incomplete." }
       - name: Build native CLI
         run: dotnet build .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release
       - name: Run native self-test
@@ -42,7 +45,7 @@ jobs:
       - name: Bundle and extension contracts
         run: |
           Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
-          $result = Invoke-Pester -Path .\Skills\Test-ScreenSkills.Tests.ps1, .\Skills\Test-PaperboyBundle.Tests.ps1, .\Skills\Test-PaperboyExtensions.Tests.ps1 -Output Detailed -PassThru
+          $result = Invoke-Pester -Path .\Skills\Test-ScreenSkills.Tests.ps1, .\Skills\Test-PaperboyBundle.Tests.ps1, .\Skills\Test-PaperboyExtensions.Tests.ps1, .\Skills\Test-PaperboyAgentCardPaths.Tests.ps1 -Output Detailed -PassThru
           if ($result.FailedCount -gt 0 -or $result.PassedCount -eq 0) { exit 1 }
       - name: Build APIM foundation
         run: dotnet build .\apps\Yumlog.APIM.Service\Yumlog.APIM.Service.fsproj -c Release
@@ -62,6 +65,10 @@ jobs:
           .\launchers\install.ps1
           .\launchers\Build-YumlogProduction.ps1 -DotnetPath dotnet
           .\launchers\Test-YumlogProductionPackage.ps1
+      - name: Studio smoke (native workspace flow)
+        run: .\launchers\Test-YumlogStudioSmoke.ps1 -SkipUi
+      - name: Media preset contracts
+        run: dotnet fsi .\launchers\test-media-presets.fsx
       - name: Agent client protocol contracts
         run: .\launchers\Test-YumlogAgentProtocol.ps1 -DotnetPath dotnet
       - name: Native CLI self-test
@@ -69,6 +76,12 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Check Yumlog NPU emulator
-        run: cargo check --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml
+        run: |
+          npm ci --prefix apps/Yumlog.NpuEmulator --ignore-scripts --no-audit --no-fund
+          cargo check --locked --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml
+          $graph = cargo tree --locked --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml -i glib --target all
+          if ($LASTEXITCODE -ne 0 -or ($graph -join [Environment]::NewLine) -match 'glib v0\.(?:[0-9]|1[0-9])\.') { throw "Vulnerable glib graph detected." }
       - name: Test Yumlog NPU emulator
-        run: cargo test --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml
+        run: cargo test --locked --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml
+      - name: Build Yumlog NPU emulator executable
+        run: npm run --prefix apps/Yumlog.NpuEmulator tauri -- build --ci --no-bundle

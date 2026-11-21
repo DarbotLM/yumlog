@@ -140,6 +140,10 @@ $exePath = Join-Path $layoutDirectory "$assemblyName.exe"
 if (-not (Test-Path -LiteralPath $exePath)) {
     throw "Packaged executable not found in layout: $exePath"
 }
+$assemblyPath = Join-Path $layoutDirectory "$assemblyName.dll"
+if (-not (Test-Path -LiteralPath $assemblyPath)) {
+    throw "Packaged native assembly not found in layout: $assemblyPath"
+}
 
 $cliProject = Join-Path $projectDirectory "..\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj"
 dotnet publish $cliProject -c $Configuration -r $RuntimeIdentifier --self-contained true -p:PublishSingleFile=false --nologo
@@ -150,6 +154,9 @@ $cliPublish = Join-Path (Split-Path -Parent $cliProject) "bin\$Configuration\$ta
 Copy-Item -Path (Join-Path $cliPublish "*") -Destination $layoutDirectory -Recurse -Force
 if (-not (Test-Path -LiteralPath (Join-Path $layoutDirectory "Yumlog.Native.Cli.exe"))) {
     throw "Packaged console executable was not found in layout."
+}
+if (-not (Test-Path -LiteralPath (Join-Path $layoutDirectory "Yumlog.Native.Cli.dll"))) {
+    throw "Packaged console assembly was not found in layout."
 }
 
 $makeappx = Find-WindowsSdkTool -ToolName "makeappx.exe"

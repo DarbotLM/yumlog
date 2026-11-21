@@ -17,16 +17,23 @@ The app owns the hard problem Yumlog needs for adaptive intelligence architectur
 
 ```powershell
 cd apps\Yumlog.NpuEmulator
-npm install
+npm install --ignore-scripts
 npm run tauri dev
 ```
+
+The desktop runtime uses the Tauri 3 CEF/GTK4 stack. It keeps the Chromium
+runtime consistent across platforms and resolves the GTK2-era `glib 0.18`
+dependency outside the patched range. Tauri 3 is currently alpha, and CEF builds
+require Rust 1.95+, CMake, Ninja, and a C/C++ toolchain. The first build downloads
+the pinned CEF distribution; later builds reuse it.
 
 Rust-only validation:
 
 ```powershell
 cd apps\Yumlog.NpuEmulator\src-tauri
-cargo test
-cargo check
+cargo test --locked
+cargo check --locked
+cargo tree --locked -i glib --target all
 ```
 
 ## Runtime model

@@ -52,6 +52,7 @@ public sealed class FoundryLocalPipelineService
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        options = options with { Model = await ResolveModelIdAsync(options, cancellationToken) };
         var files = EnumerateSupportedFiles(sourcePaths).ToArray();
         var results = new List<FoundryFileMetadata>(files.Length);
 
@@ -63,6 +64,42 @@ public sealed class FoundryLocalPipelineService
         }
 
         return new FoundryPipelineResult(DateTimeOffset.UtcNow, options.Endpoint, options.Model, results);
+    }
+
+    private static async Task<string> ResolveModelIdAsync(FoundryPipelineOptions options, CancellationToken cancellationToken)
+    {
+        var basePath = options.Endpoint.AbsolutePath.TrimEnd('/');
+        var modelsUri = new Uri(options.Endpoint, $"{basePath}/models");
+        using var response = await HttpClient.GetAsync(modelsUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Foundry model resolution failed ({(int)response.StatusCode}) at {modelsUri}: {body}");
+        }
+
+        using var document = JsonDocument.Parse(body);
+        var ids = document.RootElement.GetProperty("data").EnumerateArray()
+            .Select(model => model.GetProperty("id").GetString())
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .ToArray();
+        var exact = ids.Where(id => id.Equals(options.Model, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (exact.Length == 1)
+        {
+            return exact[0];
+        }
+
+        var aliasMatches = ids
+            .Where(id => id.StartsWith(options.Model + "-", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        return aliasMatches.Length switch
+        {
+            1 => aliasMatches[0],
+            0 => throw new ArgumentException($"Foundry model '{options.Model}' is not available at {options.Endpoint}."),
+            _ => throw new ArgumentException(
+                $"Foundry model alias '{options.Model}' is ambiguous; use one of: {string.Join(", ", aliasMatches)}.")
+        };
     }
 
     public async Task<string> WriteSidecarAsync(FoundryPipelineResult result, string destinationDirectory, CancellationToken cancellationToken = default)

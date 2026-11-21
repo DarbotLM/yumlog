@@ -51,6 +51,12 @@ function Get-PayloadDigest {
 
 Publish-Component -Project (Join-Path $repoRoot 'apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj') -Name 'Yumlog.Native.Cli'
 Publish-Component -Project (Join-Path $repoRoot 'apps\Yumlog.Native\Yumlog.Native.fsproj') -Name 'Yumlog.Native'
+foreach ($artifact in @('Yumlog.Native.dll', 'Yumlog.Native.exe')) {
+    $path = Join-Path $stage "Yumlog.Native\$artifact"
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "Yumlog.Native publish did not generate the required $artifact."
+    }
+}
 Publish-Component -Project (Join-Path $repoRoot 'apps\Paperboy.Desktop\Paperboy.Desktop.csproj') -Name 'Paperboy'
 Publish-Component -Project (Join-Path $repoRoot 'apps\Paperboy.Mcp\Paperboy.Mcp.csproj') -Name 'Paperboy.Mcp'
 Publish-Component -Project (Join-Path $repoRoot 'apps\Yumlog.APIM.Service\Yumlog.APIM.Service.fsproj') -Name 'Yumlog.APIM.Service'
@@ -62,6 +68,9 @@ if (Test-Path -LiteralPath $ffmpeg) {
         $target = Join-Path $stage "$nativeRoot\.tools\ffmpeg\bin"
         New-Item -ItemType Directory -Path $target -Force | Out-Null
         Copy-Item -LiteralPath $ffmpeg -Destination (Join-Path $target 'ffmpeg.exe') -Force
+        # Studio import reads media properties with the sibling ffprobe.exe; ship it when available.
+        $ffprobe = Join-Path (Split-Path -Parent $ffmpeg) 'ffprobe.exe'
+        if (Test-Path -LiteralPath $ffprobe) { Copy-Item -LiteralPath $ffprobe -Destination (Join-Path $target 'ffprobe.exe') -Force }
     }
 }
 
@@ -97,6 +106,17 @@ $manifest = [ordered]@{
             sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
             payloadFileCount = @(Get-ChildItem -LiteralPath $componentRoot -File -Recurse).Count
             payloadSha256 = Get-PayloadDigest -Path $componentRoot
+        }
+    }
+    nativeAssemblies = @(
+        'Yumlog.Native\Yumlog.Native.dll'
+        'Yumlog.Native.Cli\Yumlog.Native.Cli.dll'
+    ) | ForEach-Object {
+        $path = Join-Path $stage $_
+        [ordered]@{
+            path = $_
+            bytes = (Get-Item -LiteralPath $path).Length
+            sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
         }
     }
 }
