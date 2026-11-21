@@ -45,7 +45,11 @@ if (-not $ffmpeg -and -not (Test-Path $ffmpegExe)) {
 } elseif (Test-Path $ffmpegExe) {
     Write-Host "FFmpeg already installed at $ffmpegExe"
 } else {
-    Write-Host "FFmpeg found in system PATH"
+    # Stage the PATH copy so the production package can bundle FFmpeg (and ffprobe) from .tools.
+    Copy-Item -LiteralPath $ffmpeg.Source -Destination $ffmpegExe -Force
+    $probe = Join-Path (Split-Path -Parent $ffmpeg.Source) 'ffprobe.exe'
+    if (Test-Path -LiteralPath $probe) { Copy-Item -LiteralPath $probe -Destination (Join-Path $ffmpegDir 'ffprobe.exe') -Force }
+    Write-Host "FFmpeg found in system PATH; staged at $ffmpegExe"
 }
 
 # Prepend .tools/ffmpeg/bin to PATH for this session

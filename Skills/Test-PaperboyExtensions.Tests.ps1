@@ -232,7 +232,8 @@ Describe "Paperboy MCP capability surface" {
             @{ jsonrpc = '2.0'; id = 3; method = 'tools/call'; params = @{ name = 'paperboy.extensions.invoke'; arguments = @{ capabilityId = 'yumlog.native.ocr' } } }
         )
 
-        $responses[1].error | Should -BeNullOrEmpty
+        # Strict-mode safe: a successful JSON-RPC result carries no error member.
+        @($responses[1].PSObject.Properties.Name) | Should -Not -Contain 'error'
         $responses[1].result.isError | Should -BeTrue
         $responses[1].result.content[0].text | Should -BeLike '*not invocable*'
 
