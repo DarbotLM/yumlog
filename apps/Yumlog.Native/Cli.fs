@@ -49,7 +49,7 @@ Extension kinds:
     let private parseOptions args =
         let rec loop remaining configPath options =
             match remaining with
-            | [] -> configPath, NativeConfig.applyMediaPresets options
+            | [] -> configPath, options
             | "--config" :: value :: rest -> loop rest value options
             | "--force" :: rest -> loop rest configPath (Map.add "force" "true" options)
             | "--primary" :: rest -> loop rest configPath (Map.add "primary" "true" options)
@@ -118,6 +118,7 @@ Extension kinds:
             Capture(NativeConfig.mergeCapture appConfig.Capture options, configPath)
         | "record" :: args ->
             let configPath, options = parseOptions args
+            let options = NativeConfig.applyMediaPresets options
             ensureOptions
                 "record"
                 [ "out"; "out-file"; "fps"; "duration"; "ffmpeg"; "encoder"; "preset"; "backend"; "codec"

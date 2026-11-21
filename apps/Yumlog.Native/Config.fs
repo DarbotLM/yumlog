@@ -31,6 +31,8 @@ module NativeConfig =
         if Map.containsKey "resolution-preset" options then
             invalidArg "resolution-preset" "Native capture uses monitor dimensions. Resolve the export filter with launchers/media-presets.ps1."
         result
+        |> Map.remove "duration-preset"
+        |> Map.remove "frame-rate-preset"
 
     let defaultConfigPath =
         Path.Combine("config", "yumlog.native.json")
