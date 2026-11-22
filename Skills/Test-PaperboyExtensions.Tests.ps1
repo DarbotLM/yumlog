@@ -1,10 +1,7 @@
 # Pester tests for the Paperboy discoverable capability/extension contract.
 
 BeforeDiscovery {
-    $script:mcpExe = @(
-        (Join-Path $PSScriptRoot '..\apps\Paperboy.Mcp\bin\Release\net11.0-windows\Paperboy.Mcp.exe'),
-        (Join-Path $PSScriptRoot '..\apps\Paperboy.Mcp\bin\Debug\net11.0-windows\Paperboy.Mcp.exe')
-    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    $script:mcpExe = @('Release', 'Debug' | ForEach-Object { Get-ChildItem -Path (Join-Path $PSScriptRoot "..\apps\Paperboy.Mcp\bin\$_\net*-windows\Paperboy.Mcp.exe") -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending }) | Select-Object -First 1 -ExpandProperty FullName
 }
 
 BeforeAll {
@@ -23,10 +20,7 @@ BeforeAll {
             Where-Object { $_.Name -notlike '*.schema.json' }
     )
 
-    $script:mcpExe = @(
-        (Join-Path $script:repoRoot 'apps\Paperboy.Mcp\bin\Release\net11.0-windows\Paperboy.Mcp.exe'),
-        (Join-Path $script:repoRoot 'apps\Paperboy.Mcp\bin\Debug\net11.0-windows\Paperboy.Mcp.exe')
-    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    $script:mcpExe = @('Release', 'Debug' | ForEach-Object { Get-ChildItem -Path (Join-Path $script:repoRoot "apps\Paperboy.Mcp\bin\$_\net*-windows\Paperboy.Mcp.exe") -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending }) | Select-Object -First 1 -ExpandProperty FullName
 
     function script:Invoke-PaperboyMcp {
         param([Parameter(Mandatory)][object[]]$Requests)

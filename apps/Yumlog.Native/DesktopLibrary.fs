@@ -59,7 +59,7 @@ module DesktopLibrary =
              Outputs = [| "video"; "clip" |]; Actions = [| "import"; "record"; "clip"; "openSource" |] }
            { Key = "screenshot"; Label = "Screenshot"; Role = "screen-and-scene-capture"
              Inputs = [| "recording"; "timestamp"; "sceneThreshold"; "frameLimit" |]
-             Outputs = [| "frame"; "screenshot" |]; Actions = [| "capture"; "frame"; "scenes" |] }
+             Outputs = [| "frame"; "screenshot"; "systemSpecs" |]; Actions = [| "capture"; "systemSpecs"; "frame"; "scenes" |] }
            { Key = "audio"; Label = "Audio"; Role = "audio-extraction"
              Inputs = [| "audioTrack" |]; Outputs = [| "audio"; "spectrogram" |]; Actions = [| "wave"; "spectrogram" |] }
            { Key = "transcript"; Label = "Transcript"; Role = "caption-and-speech-transcription"
@@ -333,7 +333,7 @@ module DesktopLibrary =
             | "exportArtifact" -> File.Copy((findArtifact (get "artifactId")).Path, path (), true); result "File exported."
             | "readArtifact" ->
                 let item = findArtifact (get "artifactId")
-                if not (Array.contains item.Kind [| "transcript"; "runbook"; "ocr"; "catalog"; "atomicLibrary"; "semanticReport"; "bitdot"; "schema"; "document"; "agentVoices" |]) then
+                if not (Array.contains item.Kind [| "transcript"; "runbook"; "ocr"; "catalog"; "atomicLibrary"; "semanticReport"; "bitdot"; "schema"; "document"; "agentVoices"; "systemSpecs" |]) then
                     invalidOp "This output cannot be displayed as text."
                 data "" (readPreview item.Path)
             | "setSize" ->
@@ -387,6 +387,15 @@ module DesktopLibrary =
                     | Some video -> attach video files
                     | None -> save { state with Captures = Array.append files state.Captures })
                 result "Desktop screenshot saved."
+            | "systemSpecs" ->
+                // Machine-level capture: always lands in the library captures, never on a recording.
+                let settings = SystemSpecs.load ()
+                let folder = Path.Combine(state.Settings.OutputDirectory, settings.LibraryFolder)
+                let sidecar, sidecarPath = SystemSpecs.captureAndTag settings folder
+                save { state with Captures = Array.append [| plain "screenshot" sidecar.Screenshot.Path; plain "systemSpecs" sidecarPath |] state.Captures }
+                let specs = sidecar.Specs
+                data $"System specs captured: {specs.DeviceName}, {specs.Processor}, {specs.InstalledRamGb} GB RAM, {specs.OsEdition} {specs.OsVersion}."
+                    {| screenshot = sidecar.Screenshot.Path; sidecar = sidecarPath; tags = sidecar.Tags |}
             | "clip" ->
                 let video = source ()
                 let start, finish = videoTime video "start", videoTime video "end"

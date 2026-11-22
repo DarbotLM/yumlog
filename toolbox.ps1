@@ -7,7 +7,7 @@ Yumlog Windows toolbox: uprev, gate, clean production build, package verify, ins
 One entry point for the Yumlog release workflow, modeled on the a2swe toolbox.
 
 Steps (run in this order when -Step All, the default):
-  Uprev    Bumps the version (default: Patch; -Bump Minor|Major, or -Version x.y.z) in
+  Uprev    Bumps the version (default: Minor, since releases are even minors; -Bump Patch|Major, or -Version x.y.z) in
            every version source and keeps them in sync: all app .csproj/.fsproj
            Version/AssemblyVersion/FileVersion, Package.appxmanifest, Paperboy's
            generated-card version, the NPU emulator package.json/package-lock.json,
@@ -36,7 +36,7 @@ param(
     [ValidateSet('All', 'Uprev', 'Gate', 'Build', 'Verify', 'Install', 'Launch')]
     [string[]]$Step = 'All',
     [ValidateSet('Patch', 'Minor', 'Major')]
-    [string]$Bump = 'Patch',
+    [string]$Bump = 'Minor',
     [string]$Version,
     [switch]$NoUprev,
     [switch]$SkipStudioUi,
@@ -48,6 +48,9 @@ $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
 $logs = Join-Path $repo 'logs'
 New-Item -ItemType Directory -Force -Path $logs | Out-Null
+# One install root and one process list for Stop/Install/Launch. YUMLOG_INSTALL_ROOT overrides the per-user default.
+$installRoot = if ($env:YUMLOG_INSTALL_ROOT) { $env:YUMLOG_INSTALL_ROOT } else { Join-Path $env:LOCALAPPDATA 'DarbotLabs\Yumlog' }
+$yumlogProcessNames = 'Yumlog.Native', 'Yumlog.Native.Cli', 'Paperboy', 'Paperboy.Mcp', 'Yumlog.APIM.Service', 'Yumlog.WidgetStudio'
 $log = Join-Path $logs ('toolbox-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
 
 function Write-Log([string]$Message) {
@@ -136,6 +139,27 @@ function Invoke-Uprev {
     Write-Log "   version is now $new"
 }
 
+# Rust's MSVC linker needs the VC tools LIB/INCLUDE paths. A shell that is not a VS developer prompt (a
+# detached job, a scheduled task) has none, and link.exe then fails with LNK1104 'msvcrt.lib'. Import the
+# environment from the newest VS install that has the x64 VC tools; YUMLOG_VCVARS overrides the batch file.
+function Import-MsvcEnvironment {
+    if ($env:LIB -and $env:INCLUDE) { return }
+    $vcvars = $env:YUMLOG_VCVARS
+    if (-not $vcvars) {
+        $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+        if (-not (Test-Path -LiteralPath $vswhere)) { Write-Log '   vswhere not found; leaving the MSVC environment as is'; return }
+        $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        if (-not $vs) { Write-Log '   no Visual Studio install with x64 VC tools; leaving the MSVC environment as is'; return }
+        $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+    }
+    if (-not (Test-Path -LiteralPath $vcvars)) { throw "MSVC environment script not found: $vcvars" }
+    Write-Log "   importing MSVC environment from $vcvars"
+    foreach ($line in (cmd /d /c "`"$vcvars`" >nul 2>&1 && set")) {
+        if ($line -match '^([^=]+)=(.*)$') { [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process') }
+    }
+    if (-not $env:LIB) { throw "MSVC environment from $vcvars did not set LIB." }
+}
+
 function Invoke-Gate {
     Push-Location $repo
     try {
@@ -143,7 +167,7 @@ function Invoke-Gate {
         Invoke-Checked 'Paperboy MCP build' { dotnet build .\apps\Paperboy.Mcp\Paperboy.Mcp.csproj -c Release --nologo -v q }
         Invoke-Checked 'Native desktop build' { dotnet build .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release --nologo -v q }
         Invoke-Checked 'Native CLI build' { dotnet build .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release --nologo -v q }
-        Invoke-Checked 'Native self-test' { & .\apps\Yumlog.Native.Cli\bin\Release\net10.0-windows10.0.26100.0\win-x64\Yumlog.Native.Cli.exe selftest }
+        Invoke-Checked 'Native self-test' { & (Join-Path (& .\launchers\Get-YumlogBuildOutput.ps1 -Project Yumlog.Native.Cli -Configuration Release) 'Yumlog.Native.Cli.exe') selftest }
         Invoke-Checked 'Pester contracts' {
             Import-Module Pester -MinimumVersion 5.0 -ErrorAction Stop
             $result = Invoke-Pester -Path .\Skills\Test-ScreenSkills.Tests.ps1, .\Skills\Test-PaperboyBundle.Tests.ps1, .\Skills\Test-PaperboyExtensions.Tests.ps1, .\Skills\Test-PaperboyAgentCardPaths.Tests.ps1 -Output Normal -PassThru
@@ -160,6 +184,12 @@ function Invoke-Gate {
         }
         Invoke-Checked 'Agent client protocol' { .\launchers\Test-YumlogAgentProtocol.ps1 -DotnetPath dotnet }
         Invoke-Checked 'gen-audio boundary' { .\launchers\Test-YumlogGenAudio.ps1 }
+        Invoke-Checked 'System specs and update check' {
+            $specs = Join-Path $repo 'dist\SystemSpecs-toolbox'
+            Remove-Item -LiteralPath $specs -Recurse -Force -ErrorAction SilentlyContinue
+            try { .\launchers\Test-YumlogSystemSpecs.ps1 -OutputRoot $specs -Capture:(-not $SkipStudioUi) }
+            finally { Remove-Item -LiteralPath $specs -Recurse -Force -ErrorAction SilentlyContinue }
+        }
         Invoke-Checked 'Media presets' { dotnet fsi .\launchers\test-media-presets.fsx }
         Invoke-Checked 'Studio smoke' {
             $smoke = Join-Path $repo 'dist\StudioSmoke-toolbox'
@@ -168,9 +198,12 @@ function Invoke-Gate {
             finally { Remove-Item -LiteralPath $smoke -Recurse -Force -ErrorAction SilentlyContinue }
         }
         if (-not $SkipCargo) {
+            Import-MsvcEnvironment
             Invoke-Checked 'NPU emulator npm dependencies' { npm ci --prefix apps/Yumlog.NpuEmulator --ignore-scripts --no-audit --no-fund }
             Invoke-Checked 'NPU emulator cargo check' {
                 cargo check --locked --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml
+                # cargo tree below resets LASTEXITCODE, so a failed check must stop here.
+                if ($LASTEXITCODE -ne 0) { throw "cargo check failed with exit code $LASTEXITCODE." }
                 $graph = cargo tree --locked --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml -i glib --target all
                 if ($LASTEXITCODE -ne 0 -or ($graph -join [Environment]::NewLine) -match 'glib v0\.(?:[0-9]|1[0-9])\.') { throw "Vulnerable glib graph detected." }
                 $randGraph = cargo tree --locked --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml -d --target all
@@ -188,6 +221,7 @@ function Invoke-CleanBuild {
     Push-Location $repo
     try {
         Write-Log "== Clean production build $current"
+        Import-MsvcEnvironment
         Get-ChildItem -LiteralPath (Join-Path $repo 'apps') -Directory | ForEach-Object {
             foreach ($child in 'bin', 'obj') { Remove-Item -LiteralPath (Join-Path $_.FullName $child) -Recurse -Force -ErrorAction SilentlyContinue }
         }
@@ -207,8 +241,8 @@ function Invoke-PackageVerify {
 }
 
 function Stop-Yumlog {
-    $root = Join-Path $env:LOCALAPPDATA 'DarbotLabs\Yumlog'
-    Get-Process Yumlog.Native, Yumlog.Native.Cli, Paperboy, Paperboy.Mcp, Yumlog.APIM.Service, Yumlog.WidgetStudio -ErrorAction SilentlyContinue |
+    $root = $installRoot
+    Get-Process $yumlogProcessNames -ErrorAction SilentlyContinue |
         Where-Object { $_.Path -and $_.Path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) } |
         ForEach-Object { Write-Log "   stopping $($_.Name) pid $($_.Id)"; $_.Kill($true); $_.WaitForExit(10000) | Out-Null }
 }
@@ -216,12 +250,12 @@ function Stop-Yumlog {
 function Invoke-Install {
     $current = Get-RepoVersion
     Stop-Yumlog
-    Invoke-Checked 'Install in place' { & (Join-Path $repo 'launchers\Install-YumlogProduction.ps1') -PackagePath (Join-Path $repo "dist\Yumlog-$current\package") -Force | Format-List | Out-String }
+    Invoke-Checked 'Install in place' { & (Join-Path $repo 'launchers\Install-YumlogProduction.ps1') -PackagePath (Join-Path $repo "dist\Yumlog-$current\package") -Destination $installRoot -Force | Format-List | Out-String }
 }
 
 function Invoke-LaunchVerify {
     $current = Get-RepoVersion
-    $root = (Get-Content -LiteralPath (Join-Path $env:LOCALAPPDATA 'DarbotLabs\Yumlog\current.txt') -Raw).Trim()
+    $root = (Get-Content -LiteralPath (Join-Path $installRoot 'current.txt') -Raw).Trim()
     $exe = Join-Path $root 'Yumlog.Native\Yumlog.Native.exe'
     $product = (Get-Item -LiteralPath $exe).VersionInfo.ProductVersion
     if (-not $product.StartsWith($current, [StringComparison]::Ordinal)) { throw "Installed ProductVersion $product does not match $current." }

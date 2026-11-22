@@ -681,6 +681,18 @@ object recognition remains limited to the extractors listed above. MDKG graph
 snapshots track both card starts and ends over the recording's half-open time
 interval. Its proof checks establish structural inclusion and integrity.
 
+Each decimation run also writes `agent-card.json`, an AgentCard 3.1 document
+(`kind: CopilotStudioAgentCard`, `schemaVersion: 3.1`) from
+[DarbotLM/ac3.1](https://github.com/DarbotLM/ac3.1). Its knowledge entries point at
+the atomic library, bitdot layers, runbook and transcript with their SHA-256 hashes,
+and it has one topic per modality whose trigger phrases are that modality's lexical
+tags. The card kind, version and allowed fields are read from the vendored schema
+(`config/agentcards/ac3.1/agent-card.schema.json`); the id prefix, name, language,
+requirements and topic/knowledge kinds come from
+`config/agentcards/decimation-profile.json`. The card is validated against the
+schema before it is written, and `Yumlog.Native.Cli selftest` checks emission and
+rejection (`agentcard31.*`).
+
 **Insights → Import verified analysis** accepts a `source-sha256.json` whose
 `Hash` matches the current recording, with supported transcript and analysis
 sidecars beside it. The hash checks source identity; transcript alignment remains

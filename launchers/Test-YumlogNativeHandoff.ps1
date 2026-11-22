@@ -8,7 +8,7 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $Project = Join-Path $RepoRoot 'apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj'
 dotnet build $Project -c $Configuration --nologo
 if ($LASTEXITCODE -ne 0) { throw "Native build failed: $LASTEXITCODE" }
-$Dll = Join-Path $RepoRoot "apps\Yumlog.Native.Cli\bin\$Configuration\net10.0-windows10.0.26100.0\win-x64\Yumlog.Native.Cli.dll"
+$Dll = Join-Path (& (Join-Path $PSScriptRoot 'Get-YumlogBuildOutput.ps1') -Project Yumlog.Native.Cli -Configuration $Configuration -RepoRoot $RepoRoot) 'Yumlog.Native.Cli.dll'
 $WorkDir = Join-Path $RepoRoot "apps\Yumlog.Native\obj\HandoffTests-$([guid]::NewGuid().ToString('N'))"
 $InputDir = Join-Path $WorkDir 'input'
 $Session = Join-Path $WorkDir 'session'

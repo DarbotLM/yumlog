@@ -486,8 +486,129 @@ module NativeSelfTest =
                 false, error.Message
         [| check "process.children.killedOnExit" passed detail |]
 
+    let private agentCard31 () =
+        // Semantic decimation emits DarbotLM/ac3.1 AgentCard 3.1 documents. The card
+        // format comes from the embedded schema, so these checks exercise that schema.
+        let schemaCase, emitCase, rejectCase, versionCase =
+            try
+                let schema = AgentCard31.schema ()
+                let profile = AgentCard31.profile ()
+                let schemaOk = schema.Kind = "CopilotStudioAgentCard" && schema.Version = "3.1"
+                let directory = Path.Combine(Path.GetTempPath(), "yumlog-agentcard31-selftest-" + Guid.NewGuid().ToString("N"))
+                Directory.CreateDirectory(directory) |> ignore
+                try
+                    let evidence = Path.Combine(directory, "atomic-library.json")
+                    File.WriteAllText(evidence, "{\"cards\":[]}")
+                    let sha = String('a', 64)
+                    let knowledge : AgentCard31.KnowledgeFile array =
+                        [| { Name = "Atomic library"; Path = evidence; Sha256 = AgentCard31.sha256File evidence; Description = "self-test" } |]
+                    let topics : AgentCard31.TopicSeed array =
+                        [| { Modality = "audio"; CardCount = 2; Phrases = [| "decimation"; "decimation"; "speech" |] }
+                           { Modality = "video"; CardCount = 0; Phrases = [||] } |]
+                    let card = AgentCard31.build schema profile (Path.Combine(directory, "sample.mp4")) sha knowledge topics [| "cardCount", "2" |]
+                    let cardPath = Path.Combine(directory, profile.FileName)
+                    AgentCard31.write schema cardPath card
+                    let reread = Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(cardPath))
+                    let rereadErrors =
+                        match reread with
+                        | null -> [| "card did not parse" |]
+                        | node -> AgentCard31.validate node
+                    let emitOk = rereadErrors.Length = 0 && string card["kind"] = schema.Kind && string card["schemaVersion"] = schema.Version
+                    let broken = card.DeepClone()
+                    let brokenErrors =
+                        match broken with
+                        | :? Text.Json.Nodes.JsonObject as bad ->
+                            bad["kind"] <- Text.Json.Nodes.JsonValue.Create("Other")
+                            bad["unexpected"] <- Text.Json.Nodes.JsonValue.Create(1)
+                            match bad["metadata"] with
+                            | :? Text.Json.Nodes.JsonObject as metadata -> metadata["count"] <- Text.Json.Nodes.JsonValue.Create(2)
+                            | _ -> ()
+                            bad.Remove("name") |> ignore
+                            AgentCard31.validate bad
+                        | _ -> [||]
+                    let rejectOk = brokenErrors.Length = 4
+                    let mismatch =
+                        """{"$id":"https://x/agent-card/9.9/s.json","properties":{"kind":{"const":"K"},"schemaVersion":{"examples":["3.1"]}}}"""
+                    let versionOk =
+                        try AgentCard31.parseSchema mismatch |> ignore; false
+                        with :? InvalidOperationException -> true
+                    let rereadText = String.Join("; ", rereadErrors)
+                    let brokenText = String.Join("; ", brokenErrors)
+                    check "agentcard31.schema.embedded" schemaOk $"kind={schema.Kind} version={schema.Version} id={schema.Id}",
+                    check "agentcard31.emit.validates" emitOk $"{profile.FileName}: {rereadErrors.Length} violations ({rereadText})",
+                    check "agentcard31.validator.rejects" rejectOk $"{brokenErrors.Length} violations: {brokenText}",
+                    check "agentcard31.schema.versionMismatchRejected" versionOk "a schema whose $id version differs from its schemaVersion example is refused"
+                finally
+                    try Directory.Delete(directory, true) with _ -> ()
+            with error ->
+                let failed name = check name false error.Message
+                failed "agentcard31.schema.embedded", failed "agentcard31.emit.validates", failed "agentcard31.validator.rejects", failed "agentcard31.schema.versionMismatchRejected"
+        [| schemaCase; emitCase; rejectCase; versionCase |]
+
+    let private updateCheck () =
+        // Pure parts of the launch-time update check, plus a quiet offline failure.
+        let semverOk =
+            UpdateCheck.compareVersions "v0.7.0" "0.6.0" = Some 1
+            && UpdateCheck.compareVersions "0.6.0+abc123" "v0.6.0" = Some 0
+            && UpdateCheck.compareVersions "0.6.0" "0.10.0" = Some(-1)
+            && UpdateCheck.compareVersions "1.0.0-rc.1" "1.0.0" = Some(-1)
+            && UpdateCheck.compareVersions "0.7" "0.7.0" = Some 0
+            && UpdateCheck.compareVersions "latest" "0.6.0" = None
+        let parsed = UpdateCheck.parseRelease """{"tag_name":"v0.7.0","html_url":"https://github.com/darbotlabs/Yumlog/releases/tag/v0.7.0","draft":false}"""
+        let parseOk =
+            parsed = Some("v0.7.0", "https://github.com/darbotlabs/Yumlog/releases/tag/v0.7.0")
+            && UpdateCheck.parseRelease """{"message":"Not Found"}""" = None
+            && UpdateCheck.parseRelease "not json" = None
+        let settings = UpdateCheck.defaults
+        let statusOf current = (UpdateCheck.evaluate settings current (Option.get parsed)).Status
+        let evaluateOk =
+            statusOf "0.6.0" = "update-available" && statusOf "0.7.0" = "up-to-date" && statusOf "0.8.0" = "ahead"
+        let layered =
+            UpdateCheck.applyJson settings """{"update":{"repo":"DarbotLM/Yumlog","enabled":false,"timeoutMs":1500}}"""
+            |> UpdateCheck.applyEnvironment (function
+                | "YUMLOG_UPDATE_REPO" -> Some "darbotlabs/Yumlog"
+                | "YUMLOG_UPDATE_CHECK" -> Some "1"
+                | _ -> None)
+        let layeringOk =
+            layered.Repo = "darbotlabs/Yumlog" && layered.Enabled && layered.TimeoutMs = 1500
+            && (UpdateCheck.applyJson settings "{ broken").Repo = settings.Repo
+            && UpdateCheck.isValidRepo "darbotlabs/Yumlog" && not (UpdateCheck.isValidRepo "https://evil/x")
+        let disabled = (UpdateCheck.check { settings with Enabled = false } "0.6.0").GetAwaiter().GetResult()
+        let watch = Diagnostics.Stopwatch.StartNew()
+        // Port 9 (discard) on loopback refuses at once: the check must answer "unavailable", not throw.
+        let offline = (UpdateCheck.check { settings with ApiBase = "http://127.0.0.1:9"; TimeoutMs = 1500 } "0.6.0").GetAwaiter().GetResult()
+        watch.Stop()
+        let offlineOk = offline.Status = "unavailable" && watch.ElapsedMilliseconds < 5000L
+        let logOk =
+            let line = UpdateCheck.logLine offline
+            line.Contains("update-check repo=darbotlabs/Yumlog") && line.Contains("result=unavailable")
+        [| check "update.semver.compare" semverOk "v-prefix, +build, numeric minor, prerelease and two-part versions"
+           check "update.release.parse" parseOk "tag_name/html_url read; error bodies and bad JSON rejected"
+           check "update.evaluate" evaluateOk "older, equal and newer running versions"
+           check "update.settings.layering" layeringOk $"config then environment: repo={layered.Repo} enabled={layered.Enabled}"
+           check "update.disabled" (disabled.Status = "disabled") disabled.Detail
+           check "update.offline.quiet" offlineOk $"{offline.Status} in {watch.ElapsedMilliseconds} ms ({offline.Detail})"
+           check "update.logLine" logOk "log line names the repo and the result" |]
+
+    let private specsCollect () =
+        let passed, detail =
+            try
+                let specs = SystemSpecs.collect ()
+                let tags = SystemSpecs.tags specs
+                let ok =
+                    specs.DeviceName <> "" && specs.Processor <> "" && specs.InstalledRamGb > 0.0
+                    && specs.OsEdition <> "" && specs.OsBuild <> "" && specs.Volumes.Length > 0
+                    && tags |> Array.contains "system-specs"
+                ok, $"{specs.DeviceName}: {specs.Processor}, {specs.InstalledRamGb} GB, {specs.OsEdition} {specs.OsVersion} build {specs.OsBuild}, {specs.Gpus.Length} GPU(s), {specs.Volumes.Length} volume(s)"
+            with error -> false, error.Message
+        let config =
+            SystemSpecs.applyJson SystemSpecs.defaults """{"specs":{"settingsUri":"ms-settings:display","waitMs":5,"captureMethod":"screen"}}"""
+        let configOk = config.SettingsUri = "ms-settings:display" && config.WaitMs = 1000 && config.CaptureMethod = "screen"
+        [| check "specs.collect" passed detail
+           check "specs.settings.schema" configOk "specs section read with clamped waits" |]
+
     let run (sampleOut: string) =
-        let cases = Array.concat [ mdkgRoundTrip sampleOut; encoderProbe (); childCleanup () ]
+        let cases = Array.concat [ mdkgRoundTrip sampleOut; agentCard31 (); encoderProbe (); childCleanup (); updateCheck (); specsCollect () ]
         let failed = cases |> Array.filter (fun case -> not case.Passed)
 
         { Passed = failed.Length = 0

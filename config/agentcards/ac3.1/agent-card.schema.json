@@ -1,0 +1,412 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ac3.one/schemas/copilot-studio/agent-card/3.1/agent-card.schema.json",
+  "title": "CopilotStudioAgentCard",
+  "description": "AgentCard 3.1 schema for Copilot Studio agents. Describes an agent's identity, personality, topics, tools, knowledge sources, and triggers as structured metadata that can be exchanged between authoring tools, runtimes, and orchestrators.",
+  "type": "object",
+  "required": ["kind", "schemaVersion", "name"],
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "CopilotStudioAgentCard",
+      "description": "Identifies this document as a Copilot Studio AgentCard."
+    },
+    "schemaVersion": {
+      "type": "string",
+      "description": "The AgentCard schema version this document targets.",
+      "examples": ["3.1"]
+    },
+    "name": {
+      "type": "string",
+      "description": "The display name of the agent.",
+      "examples": ["Customer Support Bot", "HR Assistant"]
+    },
+    "id": {
+      "type": "string",
+      "description": "A stable, machine-readable identifier for the agent. Recommended format: reverse-DNS, e.g. 'com.contoso.agents.hr-assistant'.",
+      "examples": ["com.contoso.agents.hr-assistant"]
+    },
+    "description": {
+      "type": "string",
+      "description": "A short human-readable description of what this agent does."
+    },
+    "icon": {
+      "type": "string",
+      "format": "uri-reference",
+      "description": "URL or data-URI for the agent's icon image."
+    },
+    "language": {
+      "type": "string",
+      "description": "The primary BCP-47 language tag for the agent, e.g. 'en-US'.",
+      "examples": ["en-US", "fr-FR", "ja-JP"]
+    },
+    "instructions": {
+      "type": "string",
+      "description": "System-level instructions (the agent's 'personality prompt') that govern its behavior across all conversations."
+    },
+    "topics": {
+      "type": "array",
+      "description": "The conversation topics defined for this agent. Each topic is an AdaptiveDialog that handles a specific intent or scenario.",
+      "items": {
+        "$ref": "#/definitions/Topic"
+      }
+    },
+    "tools": {
+      "type": "array",
+      "description": "External tools (connectors, HTTP endpoints, Azure Functions, etc.) the agent can invoke.",
+      "items": {
+        "$ref": "#/definitions/Tool"
+      }
+    },
+    "knowledge": {
+      "type": "array",
+      "description": "Knowledge sources (websites, documents, SharePoint, Dataverse, etc.) the agent searches when answering questions.",
+      "items": {
+        "$ref": "#/definitions/KnowledgeSource"
+      }
+    },
+    "triggers": {
+      "type": "array",
+      "description": "Top-level triggers that activate the agent (e.g. Teams channel events, scheduled jobs, HTTP webhooks).",
+      "items": {
+        "$ref": "#/definitions/AgentTrigger"
+      }
+    },
+    "requires": {
+      "$ref": "#/definitions/Requires",
+      "description": "A map of capability name to minimum version string. The hosting runtime must satisfy all declared requirements before running the agent."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Arbitrary key-value metadata for tooling, CI/CD pipelines, or enterprise catalogues.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "definitions": {
+    "Topic": {
+      "title": "Topic",
+      "description": "A conversation topic modelled as a Copilot Studio AdaptiveDialog. Topics are the fundamental authoring unit: each topic handles one user intent and contains a trigger, a sequence of actions, and optional sub-dialogs.",
+      "type": "object",
+      "required": ["kind", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "AdaptiveDialog",
+          "description": "Must be 'AdaptiveDialog'."
+        },
+        "id": {
+          "type": "string",
+          "description": "The stable identifier for this topic, unique within the agent."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "A human-readable label shown in the Copilot Studio canvas."
+        },
+        "isEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When false the topic is disabled and will never be triggered."
+        },
+        "triggers": {
+          "type": "array",
+          "description": "Conditions that cause this topic to be activated.",
+          "items": {
+            "$ref": "#/definitions/TopicTrigger"
+          }
+        },
+        "actions": {
+          "type": "array",
+          "description": "The ordered sequence of dialog actions executed when this topic runs.",
+          "items": {
+            "$ref": "#/definitions/DialogAction"
+          }
+        },
+        "recognizer": {
+          "$ref": "#/definitions/Recognizer",
+          "description": "The NLU recognizer used to match user utterances to this topic."
+        }
+      }
+    },
+    "TopicTrigger": {
+      "title": "TopicTrigger",
+      "description": "A trigger that activates the enclosing topic when its condition is satisfied.",
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "The trigger kind, e.g. 'OnIntent', 'OnConversationStart', 'OnUnknownIntent', 'OnError', 'OnActivity'.",
+          "examples": [
+            "OnIntent",
+            "OnConversationStart",
+            "OnUnknownIntent",
+            "OnError",
+            "OnActivity"
+          ]
+        },
+        "intent": {
+          "type": "string",
+          "description": "For 'OnIntent' triggers: the recognized intent name that activates this topic."
+        },
+        "condition": {
+          "type": "string",
+          "description": "An optional adaptive expression that must evaluate to true for the trigger to fire."
+        },
+        "phrases": {
+          "type": "array",
+          "description": "For 'OnIntent' triggers: sample utterances used to train the NLU recognizer.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "DialogAction": {
+      "title": "DialogAction",
+      "description": "A single step in a topic's action sequence. Each action has a 'kind' that determines its schema.",
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "The action kind.",
+          "examples": [
+            "SendMessage",
+            "Question",
+            "SetVariable",
+            "Condition",
+            "CallTool",
+            "BeginDialog",
+            "EndDialog",
+            "RepromptDialog",
+            "CancelAllDialogs",
+            "EmitEvent",
+            "LogAction"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "description": "An optional stable identifier for this action step."
+        }
+      }
+    },
+    "Recognizer": {
+      "title": "Recognizer",
+      "description": "The NLU recognizer that evaluates user input against this topic's triggers.",
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "The recognizer implementation.",
+          "examples": [
+            "CLURecognizer",
+            "RegexRecognizer",
+            "MultiLanguageRecognizer",
+            "CrossTrainedRecognizerSet"
+          ]
+        }
+      }
+    },
+    "Tool": {
+      "title": "Tool",
+      "description": "An external tool or action the agent can invoke to retrieve data or perform operations.",
+      "type": "object",
+      "required": ["kind", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "The tool integration type.",
+          "examples": [
+            "OpenApiTool",
+            "ConnectorTool",
+            "AzureFunctionTool",
+            "FlowTool",
+            "CustomTool"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "description": "A short unique name for the tool, used to reference it from dialog actions."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of what the tool does, used by generative AI to decide when to invoke it."
+        },
+        "operationId": {
+          "type": "string",
+          "description": "For OpenAPI-backed tools: the operationId in the OpenAPI spec."
+        },
+        "endpoint": {
+          "type": "string",
+          "format": "uri",
+          "description": "The base URL of the tool's HTTP endpoint."
+        },
+        "spec": {
+          "type": "string",
+          "format": "uri-reference",
+          "description": "URI or relative path to the OpenAPI / connector spec file."
+        },
+        "parameters": {
+          "type": "array",
+          "description": "Input parameters the agent must supply when calling this tool.",
+          "items": {
+            "$ref": "#/definitions/ToolParameter"
+          }
+        },
+        "authentication": {
+          "$ref": "#/definitions/ToolAuthentication"
+        }
+      }
+    },
+    "ToolParameter": {
+      "title": "ToolParameter",
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "boolean", "array", "object"]
+        },
+        "description": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        },
+        "default": {
+          "description": "Default value for optional parameters."
+        }
+      }
+    },
+    "ToolAuthentication": {
+      "title": "ToolAuthentication",
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "Authentication scheme.",
+          "examples": ["None", "ApiKey", "OAuth2", "MicrosoftEntra", "ServicePrincipal"]
+        }
+      }
+    },
+    "KnowledgeSource": {
+      "title": "KnowledgeSource",
+      "description": "A data source the agent indexes and searches to answer questions using generative AI.",
+      "type": "object",
+      "required": ["kind", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "The knowledge source type.",
+          "examples": [
+            "PublicWebsite",
+            "SharePointSite",
+            "OneDriveFolder",
+            "DataverseTable",
+            "AzureAISearch",
+            "DocumentLibrary",
+            "CustomKnowledge"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "description": "A human-readable label for this knowledge source."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "The URL or connection string for the knowledge source."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the knowledge source's content, used to guide retrieval."
+        },
+        "isEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "When false this knowledge source is excluded from queries."
+        },
+        "filters": {
+          "type": "array",
+          "description": "Optional metadata filters applied when querying this source.",
+          "items": {
+            "type": "object",
+            "required": ["field", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "field": { "type": "string" },
+              "value": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "AgentTrigger": {
+      "title": "AgentTrigger",
+      "description": "A top-level trigger that can activate the agent from an external event source.",
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "The trigger type.",
+          "examples": [
+            "TeamsMessageReceived",
+            "WebChatMessageReceived",
+            "ScheduledJob",
+            "HttpWebhook",
+            "EventGridEvent"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "description": "Stable identifier for this agent-level trigger."
+        },
+        "channel": {
+          "type": "string",
+          "description": "For channel-based triggers: the channel identifier (e.g. 'msteams', 'directline')."
+        },
+        "condition": {
+          "type": "string",
+          "description": "An adaptive expression that gates when this trigger fires."
+        },
+        "topicId": {
+          "type": "string",
+          "description": "The topic to invoke when this trigger fires."
+        }
+      }
+    },
+    "Requires": {
+      "title": "Requires",
+      "description": "A map of capability name to the minimum version of that capability required.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "examples": [
+        {
+          "CopilotStudio": "3.1",
+          "GenerativeAnswers": "1.0"
+        }
+      ]
+    }
+  }
+}

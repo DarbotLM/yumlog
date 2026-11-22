@@ -55,6 +55,15 @@ foreach ($artifact in @('Yumlog.Native.dll', 'Yumlog.Native.exe', 'Yumlog.Native
     }
 }
 
+$stub = Join-Path $PackagePath 'Yumlog.Native\Yumlog.Native.Cli.exe'
+if ((Test-Path -LiteralPath $stub) -and -not (Test-Path -LiteralPath (Join-Path $PackagePath 'Yumlog.Native\Yumlog.Native.Cli.dll'))) {
+    throw "Package has a CLI stub without its assembly: $stub"
+}
+$shim = Join-Path $PackagePath 'Yumlog.Native.Cli\yumlog.cmd'
+if (-not (Test-Path -LiteralPath $shim)) { throw "Package is missing the yumlog command shim: $shim" }
+$reported = (& $shim --version 2>&1 | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or $reported -notmatch '^Yumlog \d+\.\d+\.\d+') { throw "yumlog --version failed: $reported" }
+
 $cli = Join-Path $PackagePath 'Yumlog.Native.Cli\Yumlog.Native.Cli.exe'
 $selftest = & $cli selftest 2>&1
 if ($LASTEXITCODE -ne 0) {

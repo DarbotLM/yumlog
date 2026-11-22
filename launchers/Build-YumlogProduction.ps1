@@ -65,6 +65,14 @@ Publish-Component -Project (Join-Path $repoRoot 'apps\Paperboy.Mcp\Paperboy.Mcp.
 Publish-Component -Project (Join-Path $repoRoot 'apps\Yumlog.APIM.Service\Yumlog.APIM.Service.fsproj') -Name 'Yumlog.APIM.Service'
 Publish-Component -Project (Join-Path $repoRoot 'apps\Yumlog.WidgetStudio\Yumlog.WidgetStudio.csproj') -Name 'Yumlog.WidgetStudio'
 
+# The Studio folder must not carry a CLI apphost without its dll (see RemoveCliStub* in Yumlog.Native.fsproj).
+$stub = Join-Path $stage 'Yumlog.Native\Yumlog.Native.Cli.exe'
+if ((Test-Path -LiteralPath $stub) -and -not (Test-Path -LiteralPath (Join-Path $stage 'Yumlog.Native\Yumlog.Native.Cli.dll'))) {
+    throw "Yumlog.Native publish still contains a CLI stub without its assembly: $stub"
+}
+# `yumlog` on the user PATH (the installer adds the Yumlog.Native.Cli folder) forwards to the real CLI.
+Set-Content -LiteralPath (Join-Path $stage 'Yumlog.Native.Cli\yumlog.cmd') -Value "@echo off`r`n`"%~dp0Yumlog.Native.Cli.exe`" %*`r`n" -Encoding ascii -NoNewline
+
 $ffmpeg = Join-Path $repoRoot '.tools\ffmpeg\bin\ffmpeg.exe'
 if (Test-Path -LiteralPath $ffmpeg) {
     foreach ($nativeRoot in @('Yumlog.Native', 'Yumlog.Native.Cli')) {

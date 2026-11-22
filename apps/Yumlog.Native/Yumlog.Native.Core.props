@@ -21,11 +21,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- WMI/CIM reads for SystemSpecs.fs (both projects compile it). -->
+    <PackageReference Include="System.Management" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="$(YumlogNativeDir)..\..\config\media-presets.json" LogicalName="Yumlog.MediaPresets.json" />
+    <EmbeddedResource Include="$(YumlogNativeDir)..\..\config\agentcards\ac3.1\agent-card.schema.json" LogicalName="Yumlog.AgentCard31.Schema.json" />
+    <EmbeddedResource Include="$(YumlogNativeDir)..\..\config\agentcards\decimation-profile.json" LogicalName="Yumlog.AgentCard31.Profile.json" />
     <Compile Include="$(YumlogNativeDir)Domain.fs" Link="Domain.fs" />
     <Compile Include="$(YumlogNativeDir)ChildProcesses.fs" Link="ChildProcesses.fs" />
     <Compile Include="$(YumlogNativeDir)GenAudio.fs" Link="GenAudio.fs" />
     <Compile Include="$(YumlogNativeDir)Json.fs" Link="Json.fs" />
+    <Compile Include="$(YumlogNativeDir)AgentCard31.fs" Link="AgentCard31.fs" />
+    <Compile Include="$(YumlogNativeDir)UpdateCheck.fs" Link="UpdateCheck.fs" />
+    <Compile Include="$(YumlogNativeDir)SystemSpecs.fs" Link="SystemSpecs.fs" />
     <Compile Include="$(YumlogNativeDir)Mdkg.fs" Link="Mdkg.fs" />
     <Compile Include="$(YumlogNativeDir)MdkgIntel.fs" Link="MdkgIntel.fs" />
     <Compile Include="$(YumlogNativeDir)SelfTest.fs" Link="SelfTest.fs" />

@@ -13,7 +13,7 @@ if (-not $SkipBuild) {
  dotnet build (Join-Path $repo 'apps\Yumlog.Native\Yumlog.Native.fsproj') -c $Configuration --nologo
  if ($LASTEXITCODE -ne 0) { throw 'Studio build failed.' }
 }
-$bin=Join-Path $repo "apps\Yumlog.Native\bin\$Configuration\net10.0-windows10.0.26100.0\win-x64"
+$bin=& (Join-Path $PSScriptRoot 'Get-YumlogBuildOutput.ps1') -Project Yumlog.Native -Configuration $Configuration
 if (-not (Test-Path -LiteralPath (Join-Path $bin 'Yumlog.Native.dll'))) {
     throw "Studio build did not produce Yumlog.Native.dll at $bin. Run without -SkipBuild."
 }

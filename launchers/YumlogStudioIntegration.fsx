@@ -134,6 +134,15 @@ try
         require (bin=int(ceil media.Duration) && bin=(prop "binCount" layersDoc.RootElement).GetInt32()) "Bitdot does not span full source"
         pass "insights.bitdot-coverage" $"{bin} one-second bins, no gaps/overlaps"
         pass "library.atomic-cards" $"{cards.GetArrayLength()} uniquely identified source-linked cards"
+        let agentCard = first "agentCard"
+        let agentCardNode = Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(agentCard.Path))
+        let agentCardErrors = match agentCardNode with | null -> [| "agent card did not parse" |] | node -> AgentCard31.validate node
+        let cardSchema = AgentCard31.schema ()
+        use agentCardDoc = JsonDocument.Parse(File.ReadAllText(agentCard.Path))
+        require (agentCardErrors.Length = 0) ("AgentCard 3.1 failed schema validation: " + String.Join("; ", agentCardErrors))
+        require (text "kind" agentCardDoc.RootElement = cardSchema.Kind && text "schemaVersion" agentCardDoc.RootElement = cardSchema.Version) "AgentCard kind/version do not come from the ac3.1 schema"
+        require ((prop "metadata" agentCardDoc.RootElement |> text "cardCount") = string (cards.GetArrayLength())) "AgentCard cardCount does not match the atomic library"
+        pass "library.agentcard31" $"{cardSchema.Kind} {cardSchema.Version} validates against the embedded ac3.1 schema"
         let mdkg=first "timedMetadata"
         use reader=Mdkg.openReader mdkg.Path
         let book=MdkgIntel.buildRunbook reader

@@ -119,6 +119,58 @@ module Program =
                 eprintfn "Wrote %s" (Path.GetFullPath(get "srt-out"))
             if get "json-out" = "" then writeJson receipt else writeJsonFile (get "json-out") receipt
             0
+        | ShowVersion ->
+            let informational =
+                match Reflection.Assembly.GetExecutingAssembly().GetCustomAttributes(typeof<Reflection.AssemblyInformationalVersionAttribute>, false) with
+                | [| :? Reflection.AssemblyInformationalVersionAttribute as attribute |] -> attribute.InformationalVersion
+                | _ -> UpdateCheck.currentVersion ()
+            printfn "Yumlog %s (%s)" (UpdateCheck.currentVersion ()) informational
+            0
+        | UpdateCheckRun options ->
+            let get key = options |> Map.tryFind key
+            let settings = UpdateCheck.load ()
+            let settings =
+                { settings with
+                    Repo = get "repo" |> Option.defaultValue settings.Repo
+                    ApiBase = get "api" |> Option.defaultValue settings.ApiBase
+                    TimeoutMs = get "timeout-ms" |> Option.map int |> Option.defaultValue settings.TimeoutMs }
+            let value = (UpdateCheck.check settings (UpdateCheck.currentVersion ())).GetAwaiter().GetResult()
+            UpdateCheck.record value
+            eprintfn "%s" (UpdateCheck.logLine value)
+            match get "json-out" with
+            | Some path -> writeJsonFile path value
+            | None -> writeJson value
+            // Offline or rate-limited is not an error: the check is advisory.
+            0
+        | Specs options ->
+            let get key = options |> Map.tryFind key
+            let settings = SystemSpecs.load ()
+            let number key fallback = get key |> Option.map int |> Option.defaultValue fallback
+            let settings =
+                { settings with
+                    SettingsUri = get "uri" |> Option.defaultValue settings.SettingsUri
+                    WindowTitle = get "window-title" |> Option.defaultValue settings.WindowTitle
+                    WindowClass = get "window-class" |> Option.defaultValue settings.WindowClass
+                    WaitMs = number "wait-ms" settings.WaitMs
+                    SettleMs = number "settle-ms" settings.SettleMs
+                    CaptureMethod = get "capture-method" |> Option.defaultValue settings.CaptureMethod }
+            if get "collect-only" = Some "true" then
+                let specs = SystemSpecs.collect ()
+                let value = {| schema = SystemSpecs.SidecarSchema; tags = SystemSpecs.tags specs; specs = specs |}
+                match get "json-out" with
+                | Some path -> writeJsonFile path value
+                | None -> writeJson value
+            else
+                let outDir =
+                    get "out-dir"
+                    |> Option.defaultWith (fun () -> Path.Combine(UpdateCheck.dataRoot (), "Studio", "Exports", settings.LibraryFolder))
+                let sidecar, sidecarPath = SystemSpecs.captureAndTag settings outDir
+                eprintfn "Captured %s (%dx%d, %d bytes, %s) and tagged %s"
+                    sidecar.Screenshot.Path sidecar.Screenshot.Width sidecar.Screenshot.Height sidecar.Screenshot.Bytes sidecar.Screenshot.Method sidecarPath
+                match get "json-out" with
+                | Some path -> writeJsonFile path sidecar
+                | None -> writeJson sidecar
+            0
         | ListModels ->
             let models = OnDeviceLlm.discoverAll()
 
@@ -207,6 +259,9 @@ module Program =
         | Watch _
         | Speak _
         | Transcribe _
+        | ShowVersion
+        | UpdateCheckRun _
+        | Specs _
         | ListModels
         | Handoff _
         | Readiness _
