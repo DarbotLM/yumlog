@@ -1,22 +1,31 @@
 [CmdletBinding()]
 param(
-    [string]$PackagePath = (Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path 'dist\Yumlog-0.6.0\package'),
+    [string]$PackagePath,
+    [string]$ExpectedVersion,
     [string]$Destination = (Join-Path $env:LOCALAPPDATA 'DarbotLabs\Yumlog'),
     [switch]$Force,
     [switch]$NoUserIntegration
 )
 
 $ErrorActionPreference = 'Stop'
+# Inside a checkout the expected version is the repo version; elsewhere the package manifest decides.
+$repoVersion = & (Join-Path $PSScriptRoot 'Get-YumlogVersion.ps1')
+if (-not $ExpectedVersion) { $ExpectedVersion = $repoVersion }
+if (-not $PackagePath) {
+    if (-not $repoVersion) { throw 'Pass -PackagePath when running outside a Yumlog checkout.' }
+    $PackagePath = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..')).Path "dist\Yumlog-$repoVersion\package"
+}
 $manifestPath = Join-Path $PackagePath 'release-manifest.json'
 if (-not (Test-Path -LiteralPath $manifestPath)) {
     throw "Production package manifest was not found: $manifestPath"
 }
 
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.version -ne '0.6.0') {
+if ($manifest.schema -ne 'urn:yumlog:release:v1' -or $manifest.version -notmatch '^\d+\.\d+\.\d+$' -or ($ExpectedVersion -and $manifest.version -ne $ExpectedVersion)) {
     throw "Unsupported package version '$($manifest.version)'."
 }
 
+$Destination = [IO.Path]::GetFullPath($Destination).TrimEnd('\')
 $versionRoot = Join-Path $Destination $manifest.version
 New-Item -ItemType Directory -Path $Destination -Force | Out-Null
 if (Test-Path -LiteralPath $versionRoot) {
@@ -31,7 +40,15 @@ Copy-Item -Path (Join-Path $PackagePath '*') -Destination $versionRoot -Recurse 
 Set-Content -LiteralPath (Join-Path $Destination 'current.txt') -Value $versionRoot -Encoding UTF8
 # Upgrade in place: one installed version only. Remove other version folders
 # and their user PATH entries once the new version is in place.
-$retired = @(Get-ChildItem -LiteralPath $Destination -Directory | Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' -and $_.Name -ne $manifest.version })
+# Only a DarbotLabs\Yumlog install root is cleaned, and only folders that hold a Yumlog release manifest.
+$managedRoot = $Destination.EndsWith('\DarbotLabs\Yumlog', [StringComparison]::OrdinalIgnoreCase)
+$retired = @(if ($managedRoot) {
+    Get-ChildItem -LiteralPath $Destination -Directory | Where-Object {
+        $oldManifest = Join-Path $_.FullName 'release-manifest.json'
+        $_.Name -match '^\d+\.\d+\.\d+$' -and $_.Name -ne $manifest.version -and (Test-Path -LiteralPath $oldManifest) -and
+            ((Get-Content -LiteralPath $oldManifest -Raw | ConvertFrom-Json).schema -eq 'urn:yumlog:release:v1')
+    }
+})
 foreach ($old in $retired) {
     Remove-Item -LiteralPath $old.FullName -Recurse -Force
 }
@@ -52,12 +69,15 @@ if (-not $NoUserIntegration) {
     $shell = New-Object -ComObject WScript.Shell
     $shortcutDirectory = Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs\DarbotLabs Yumlog'
     New-Item -ItemType Directory -Path $shortcutDirectory -Force | Out-Null
-    Get-ChildItem -LiteralPath $shortcutDirectory -Filter '*.lnk' | Where-Object { $_.Name -notlike "* $($manifest.version).lnk" } | Remove-Item -Force
+    # Retire only this suite's versioned shortcuts; anything else in the folder is left alone.
+    Get-ChildItem -LiteralPath $shortcutDirectory -Filter '*.lnk' |
+        Where-Object { $_.Name -match '^(Yumlog Native|Yumlog Widget Studio|Paperboy) \d+\.\d+\.\d+\.lnk$' -and $_.Name -notlike "* $($manifest.version).lnk" } |
+        Remove-Item -Force
 
     foreach ($shortcut in @(
-        @{ Name = 'Yumlog Native 0.6.0.lnk'; Target = Join-Path $versionRoot 'Yumlog.Native\Yumlog.Native.exe'; Arguments = '' }
-        @{ Name = 'Paperboy 0.6.0.lnk'; Target = Join-Path $versionRoot 'Paperboy\Paperboy.exe'; Arguments = '' }
-        @{ Name = 'Yumlog Widget Studio 0.6.0.lnk'; Target = Join-Path $versionRoot 'Yumlog.WidgetStudio\Yumlog.WidgetStudio.exe'; Arguments = '--help' }
+        @{ Name = "Yumlog Native $($manifest.version).lnk"; Target = Join-Path $versionRoot 'Yumlog.Native\Yumlog.Native.exe'; Arguments = '' }
+        @{ Name = "Paperboy $($manifest.version).lnk"; Target = Join-Path $versionRoot 'Paperboy\Paperboy.exe'; Arguments = '' }
+        @{ Name = "Yumlog Widget Studio $($manifest.version).lnk"; Target = Join-Path $versionRoot 'Yumlog.WidgetStudio\Yumlog.WidgetStudio.exe'; Arguments = '--help' }
     )) {
         $link = $shell.CreateShortcut((Join-Path $shortcutDirectory $shortcut.Name))
         $link.TargetPath = $shortcut.Target
