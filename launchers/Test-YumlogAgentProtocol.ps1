@@ -155,6 +155,7 @@ try {
         }
         $tagFiles = @()
         $tagErrors = @()
+        $checkpoint = $null
         if (Test-Path -LiteralPath $ReportPath -PathType Leaf) {
             $checkpoint = Get-Content -LiteralPath $ReportPath -Raw | ConvertFrom-Json
             if ($checkpoint.schema -eq 'urn:yumlog:tagging-checkpoint:v1' -and
@@ -167,7 +168,7 @@ try {
         foreach ($file in $tagFiles) { $completed[$file.path] = $true }
         $tagErrors = @($tagErrors | Where-Object { -not $completed.ContainsKey($_.path) })
         $pending = @($sourceFiles | Where-Object { -not $completed.ContainsKey($_) })
-        $startedUtc = [DateTimeOffset]::UtcNow
+        $startedUtc = if ($checkpoint -and $checkpoint.startedUtc) { $checkpoint.startedUtc } else { [DateTimeOffset]::UtcNow }
         $sinceRecycle = 0
 
         function Save-TagCheckpoint([bool]$Complete) {
