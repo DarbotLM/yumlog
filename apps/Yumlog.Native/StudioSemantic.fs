@@ -145,7 +145,7 @@ module StudioSemantic =
         let reused = not (String.IsNullOrWhiteSpace(transcriptPath))
         if reused then
             if not (File.Exists(transcriptPath)) then invalidArg "transcriptPath" "Attached transcript is missing."
-            let extension = Path.GetExtension(transcriptPath).ToLowerInvariant()
+            let extension = (orEmptyIfNull (Path.GetExtension(transcriptPath))).ToLowerInvariant()
             if extension <> ".srt" && extension <> ".vtt" then invalidOp "Full decimation requires a timestamped SRT or VTT transcript; plain text cannot be aligned honestly."
             File.Copy(transcriptPath, transcript, false)
         elif media.AudioCodec <> "" then DesktopMedia.transcribe ffmpeg whisper model videoPath transcript
@@ -214,7 +214,7 @@ module StudioSemantic =
             {| font = unknown "SRT/VTT carries no reliable source document font."; header = measured (Path.GetFileName(videoPath))
                schema = measured "urn:yumlog:timestamped-transcript:v1"
                fields = measured [| "startSeconds"; "endSeconds"; "text" |]
-               format = measured (if reused then Path.GetExtension(transcriptPath).TrimStart('.') else "srt")
+               format = measured (if reused then (orEmptyIfNull (Path.GetExtension(transcriptPath))).TrimStart('.') else "srt")
                entityName = measured "TranscriptCue"; friendlyName = measured "Timestamped speech cue"
                customerFields = unknown "No customer-specific document fields were supplied."
                cueCount = measured cues.Length |}
@@ -232,7 +232,7 @@ module StudioSemantic =
         let mutable documentCount = 0
         if Directory.Exists(documentDirectory) then
             for path in Directory.GetFiles(documentDirectory) |> Array.sort do
-                let ext = Path.GetExtension(path).ToLowerInvariant()
+                let ext = (orEmptyIfNull (Path.GetExtension(path))).ToLowerInvariant()
                 if [| ".json"; ".csv"; ".txt"; ".md" |] |> Array.contains ext then
                     if FileInfo(path).Length > 8_000_000L then invalidOp "Attached text documents must be at most 8 MB."
                     let text = File.ReadAllText(path)
@@ -259,7 +259,7 @@ module StudioSemantic =
                            fields = measured fields; format = measured (ext.TrimStart('.')); entityName = measured (Path.GetFileNameWithoutExtension(path))
                            friendlyName = measured (Path.GetFileName(path)); customerFields = measured fields; headings = measured headings |}
                     let id = "document-" + string documentCount
-                    addCard "document" "attached-document-schema" (Path.GetFileName(path)) 0. media.Duration
+                    addCard "document" "attached-document-schema" (orEmptyIfNull (Path.GetFileName(path))) 0. media.Duration
                         { Path = path; Sha256 = FileHash.sha256 path; StartSeconds = 0.; EndSeconds = media.Duration }
                         attributes (tags (text.Substring(0, min 50000 text.Length))) "Structure distilled from staged attached document bytes"
                         [| "Document attached to recording; no claim its contents appeared on screen."; "Schema describes sampled structure and must be reviewed before reuse." |]

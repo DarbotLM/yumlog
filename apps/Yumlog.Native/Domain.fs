@@ -534,6 +534,10 @@ type NativeCommand =
     | Runbook of string * string * string
     | Reason of ReasonConfig
     | Watch of WatchConfig
+    /// gen-audio speech synthesis (options from the command line).
+    | Speak of Map<string, string>
+    /// gen-audio VibeVoice transcription (options from the command line).
+    | Transcribe of Map<string, string>
     | ListModels
     | Help
 

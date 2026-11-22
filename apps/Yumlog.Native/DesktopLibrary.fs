@@ -17,7 +17,12 @@ module DesktopLibrary =
           CardSize: string
           FfmpegPath: string
           WhisperPath: string
-          WhisperModel: string }
+          WhisperModel: string
+          GenAudioPython: string
+          GenAudioRoot: string
+          GenAudioEngine: string
+          GenAudioVoice: string
+          VibeVoiceModel: string }
 
     type Artifact =
         { Id: string
@@ -59,7 +64,7 @@ module DesktopLibrary =
              Inputs = [| "audioTrack" |]; Outputs = [| "audio"; "spectrogram" |]; Actions = [| "wave"; "spectrogram" |] }
            { Key = "transcript"; Label = "Transcript"; Role = "caption-and-speech-transcription"
              Inputs = [| "captionFile"; "subtitleTrack"; "audioTrack"; "whisperModel" |]; Outputs = [| "transcript" |]
-             Actions = [| "attachTranscript"; "subtitles"; "transcribe" |] }
+             Actions = [| "attachTranscript"; "subtitles"; "transcribe"; "genAudioTranscribe" |] }
            { Key = "agents"; Label = "Agents"; Role = "native-capability-catalog"
              Inputs = [| "extensionManifests"; "windowsAiRuntime"; "audioTrack" |]
              Outputs = [| "catalog"; "ocrReadiness"; "agentVoices"; "agentVoice" |]
@@ -67,7 +72,7 @@ module DesktopLibrary =
            { Key = "voices"; Label = "Voices"; Role = "recording-speakers-and-narration"
              Inputs = [| "audioTrack"; "installedVoice"; "script" |]
              Outputs = [| "agentVoices"; "agentVoice"; "voice" |]
-             Actions = [| "detectAgentVoices"; "agentVoices"; "voices"; "speak" |] }
+             Actions = [| "detectAgentVoices"; "agentVoices"; "voices"; "speak"; "genAudioSpeak" |] }
            { Key = "insights"; Label = "Insights"; Role = "recording-and-frame-analysis"
              Inputs = [| "recording"; "frame"; "timedMetadata" |]; Outputs = [| "mediaInfo"; "ocr"; "runbook" |]
              Actions = [| "probe"; "ocr"; "runbook"; "decimate"; "importAnalysis" |] }
@@ -167,7 +172,8 @@ module DesktopLibrary =
     type Workspace(root: string) =
         let settings =
             { OutputDirectory = Path.Combine(root, "Exports"); CardSize = "studio"
-              FfmpegPath = ""; WhisperPath = ""; WhisperModel = "" }
+              FfmpegPath = ""; WhisperPath = ""; WhisperModel = ""
+              GenAudioPython = ""; GenAudioRoot = ""; GenAudioEngine = ""; GenAudioVoice = ""; VibeVoiceModel = "" }
         let statePath = Path.Combine(root, "studio.json")
         let defaults = { Settings = settings; SelectedId = ""; Videos = [||]; Captures = [||] }
         let mutable state = if File.Exists(statePath) then NativeJson.readOver defaults statePath else defaults
@@ -178,6 +184,11 @@ module DesktopLibrary =
             if String.IsNullOrWhiteSpace(state.Settings.FfmpegPath) then original
             else { original with FFmpegPath = state.Settings.FfmpegPath }
         let ffmpeg () = NativeRecording.resolveFfmpeg (recordConfig ())
+        let genAudio () =
+            { GenAudio.defaults with
+                Python = state.Settings.GenAudioPython; Root = state.Settings.GenAudioRoot
+                Engine = state.Settings.GenAudioEngine; Voice = state.Settings.GenAudioVoice
+                VibeVoiceModel = state.Settings.VibeVoiceModel }
 
         let save updated =
             writeAtomic statePath updated
@@ -338,9 +349,17 @@ module DesktopLibrary =
                     if value <> "" && (not (Path.IsPathFullyQualified(value)) || not (File.Exists(value))) then
                         invalidOp $"The configured file for {name} is unavailable."
                     value
+                let folder name =
+                    let value = (get name).Trim()
+                    if value <> "" && (not (Path.IsPathFullyQualified(value)) || not (Directory.Exists(value))) then
+                        invalidOp $"The configured folder for {name} is unavailable."
+                    value
                 let updated =
                     { state.Settings with OutputDirectory = Path.GetFullPath(output); FfmpegPath = file "ffmpegPath"
-                                          WhisperPath = file "whisperPath"; WhisperModel = file "whisperModel" }
+                                          WhisperPath = file "whisperPath"; WhisperModel = file "whisperModel"
+                                          GenAudioPython = file "genAudioPython"; GenAudioRoot = folder "genAudioRoot"
+                                          GenAudioEngine = (get "genAudioEngine").Trim(); GenAudioVoice = (get "genAudioVoice").Trim()
+                                          VibeVoiceModel = folder "vibeVoiceModel" }
                 Directory.CreateDirectory(updated.OutputDirectory) |> ignore
                 save { state with Settings = updated }
                 result "Settings saved."
@@ -417,6 +436,19 @@ module DesktopLibrary =
                     else DesktopMedia.transcribe (ffmpeg ()) state.Settings.WhisperPath state.Settings.WhisperModel video.Path
                 createArtifact video "transcript" "transcript.srt" extract
                 result "Transcript saved."
+            | "genAudioTranscribe" ->
+                let video = source ()
+                let receipt = ref None
+                createArtifact video "transcript" "transcript-vibevoice.srt" (fun output ->
+                    let pcm = Path.ChangeExtension(output, ".wav") |> orEmptyIfNull
+                    try
+                        DesktopMedia.voiceAnalysisWave (ffmpeg ()) video.Path pcm
+                        let transcript = GenAudio.transcribe (genAudio ()) pcm
+                        File.WriteAllText(output, GenAudio.toSrt transcript)
+                        receipt.Value <- Some transcript
+                    finally
+                        File.Delete(pcm))
+                data "Transcript saved from gen-audio VibeVoice." receipt.Value.Value
             | "attachDocument" ->
                 let input = path ()
                 if not (Set.contains (DesktopMedia.extension input) (set [ ".txt"; ".md"; ".json"; ".csv" ])) then
@@ -530,6 +562,17 @@ module DesktopLibrary =
                 if String.IsNullOrWhiteSpace(script) || script.Length > 10000 then invalidOp "Enter between 1 and 10,000 characters."
                 createArtifact (current ()) "voice" "narration.wav" (DesktopMedia.speak (get "voice") script)
                 result "Narration rendered."
+            | "genAudioSpeak" ->
+                let script = get "script"
+                if String.IsNullOrWhiteSpace(script) || script.Length > 10000 then invalidOp "Enter between 1 and 10,000 characters."
+                let settings =
+                    match (get "voice").Trim() with
+                    | "" -> genAudio ()
+                    | voice -> { genAudio () with Voice = voice }
+                let receipt = ref None
+                createArtifact (current ()) "voice" "narration-gen-audio.wav" (fun output ->
+                    receipt.Value <- Some(GenAudio.renderSpeech settings script output))
+                data "Narration rendered with gen-audio." receipt.Value.Value
             | "probe" ->
                 let video = source ()
                 update { video with Media = Some(DesktopMedia.probe (ffmpeg ()) video.Path) }

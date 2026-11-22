@@ -65,12 +65,16 @@ jobs:
           .\launchers\install.ps1
           .\launchers\Build-YumlogProduction.ps1 -DotnetPath dotnet
           .\launchers\Test-YumlogProductionPackage.ps1
+      - name: Studio script syntax
+        run: node --check apps/Yumlog.Native/Studio/studio.js
       - name: Studio smoke (native workspace flow)
         run: .\launchers\Test-YumlogStudioSmoke.ps1 -SkipUi
       - name: Media preset contracts
         run: dotnet fsi .\launchers\test-media-presets.fsx
       - name: Review tools contracts (OCR, MDKG import, runbook proofs)
         run: .\launchers\Test-YumlogReviewTools.ps1
+      - name: gen-audio speech and transcription boundary
+        run: .\launchers\Test-YumlogGenAudio.ps1
       - name: Agent client protocol contracts
         run: .\launchers\Test-YumlogAgentProtocol.ps1 -DotnetPath dotnet
       - name: Native CLI self-test

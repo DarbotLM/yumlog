@@ -87,3 +87,5 @@ clippyclaw-validation-*/
 
 # Studio smoke harness manifest (other package.json files stay ignored)
 !qa/studio-smoke/package.json
+# Python bytecode (gen-audio stub, tools/review)/
+*.pyc

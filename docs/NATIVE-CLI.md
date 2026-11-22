@@ -29,6 +29,32 @@ $exe = ".\apps\Yumlog.Native.Cli\bin\Release\net10.0-windows10.0.26100.0\win-x64
 | `reason` | Answer a question about a recording using an on-device LLM |
 | `watch` | Live screen observation with periodic narration |
 | `models` | List installed on-device models |
+| `speak` | Render narration through gen-audio (`render_speech`) and verify its receipt |
+| `transcribe` | Transcribe a WAV with gen-audio VibeVoice ASR into a receipt and optional SRT |
+
+### speak and transcribe (gen-audio)
+
+```
+speak (--text text | --text-file path) --out-file path.wav [--engine kokoro_onnx] [--voice id]
+      [--language en-us] [--python path] [--gen-audio-root path] [--json-out path]
+transcribe --input path.wav [--model dir] [--device cpu|cuda] [--srt-out path]
+           [--json-out path] [--python path] [--gen-audio-root path]
+```
+
+Yumlog calls [darbotlabs/gen-audio](https://github.com/darbotlabs/gen-audio) only through its two
+CLI entry points, `python -m gen_audio.cli.render_speech` and `python -m gen_audio.cli.transcribe_vibevoice`.
+The script goes to gen-audio on stdin as UTF-8. Yumlog accepts a WAV only when its SHA-256, sample
+rate, and duration match the JSON receipt gen-audio prints. A non-zero gen-audio exit fails the
+command with the tail of gen-audio's stderr.
+
+Defaults come from the environment when a flag is omitted: `GEN_AUDIO_PYTHON` (else `python`),
+`GEN_AUDIO_ROOT` (its `src` is prepended to `PYTHONPATH`), `YUMLOG_GEN_AUDIO_ENGINE` (else `kokoro_onnx`),
+`YUMLOG_GEN_AUDIO_VOICE`, `YUMLOG_GEN_AUDIO_LANGUAGE` (else `en-us`), `GEN_AUDIO_VIBEVOICE_ASR_MODEL`,
+and `YUMLOG_GEN_AUDIO_DEVICE` (else `cpu`). Studio exposes the same settings, plus
+"Transcribe with gen-audio VibeVoice" on the Transcript tab and "Render with gen-audio" on the Voices tab.
+
+`launchers\Test-YumlogGenAudio.ps1` checks this boundary against a stdlib-only stub in
+`qa\gen-audio-stub` (no models needed). Pass `-LiveRoot <gen-audio checkout> -LiveVoice <id>` to render real speech too.
 
 ### record
 
