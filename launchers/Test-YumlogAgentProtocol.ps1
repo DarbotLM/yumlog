@@ -165,6 +165,7 @@ try {
         }
         $completed = @{}
         foreach ($file in $tagFiles) { $completed[$file.path] = $true }
+        $tagErrors = @($tagErrors | Where-Object { -not $completed.ContainsKey($_.path) })
         $pending = @($sourceFiles | Where-Object { -not $completed.ContainsKey($_) })
         $startedUtc = [DateTimeOffset]::UtcNow
         $sinceRecycle = 0
