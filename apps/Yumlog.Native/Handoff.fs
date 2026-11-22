@@ -160,8 +160,8 @@ module NativeHandoff =
         if String.IsNullOrWhiteSpace(config.Input) || String.IsNullOrWhiteSpace(config.OutDir) then
             invalidArg "config" "Input and output directory are required."
         let mode = if String.IsNullOrWhiteSpace(config.OcrMode) then "none" else config.OcrMode.Trim().ToLowerInvariant()
-        if not (List.contains mode [ "none"; "auto"; "windows-ai"; "raw-com" ]) then
-            invalidArg "ocr" "Use none, auto, windows-ai, or raw-com."
+        if not (List.contains mode [ "none"; "auto"; "windows-ai"; "raw-com"; "npu-emulated"; "npu-emulated-cpu" ]) then
+            invalidArg "ocr" "Use none, auto, windows-ai, raw-com, or npu-emulated."
         let options: HandoffOptions = { OcrMode = mode }
         let input = Path.GetFullPath(config.Input)
         let target = Path.TrimEndingDirectorySeparator(Path.GetFullPath(config.OutDir))

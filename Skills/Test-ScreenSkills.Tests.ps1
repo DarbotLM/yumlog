@@ -19,6 +19,20 @@ Describe "yumlog Record-Screen" {
         }
     }
 
+    It "records HEVC with libx265 by default and keeps H.264 with libx264 as an option" {
+        Mock Run-FFmpeg
+
+        Record-Screen -Fps 5 -DurationSec 1 -OutFile "hevc.mp4"
+        Should -Invoke Run-FFmpeg -Times 1 -Exactly -ParameterFilter {
+            ($Arguments -join ' ') -match '-c:v libx265 -tag:v hvc1' -and ($Arguments -join ' ') -match '-preset medium'
+        }
+
+        Record-Screen -Fps 5 -DurationSec 1 -OutFile "h264.mp4" -Codec h264
+        Should -Invoke Run-FFmpeg -Times 1 -Exactly -ParameterFilter {
+            ($Arguments -join ' ') -match '-c:v libx264' -and $Arguments -notcontains 'libx265'
+        }
+    }
+
     It "rejects invalid timing" {
         { Record-Screen -Fps 0 -DurationSec 1 } | Should -Throw
         { Record-Screen -Fps 1 -DurationSec 0 } | Should -Throw

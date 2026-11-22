@@ -9,11 +9,20 @@ function Record-Screen {
         [ValidateRange(1, 86400)]
         [int]$DurationSec = 10,
         [Parameter(Mandatory=$false)]
-        [string]$OutFile = "./screenrecord.mp4"
+        [string]$OutFile = "./screenrecord.mp4",
+        # HEVC through libx265 is the default; H.264 through libx264 stays available.
+        [Parameter(Mandatory=$false)]
+        [ValidateSet('hevc', 'h264')]
+        [string]$Codec = 'hevc',
+        [Parameter(Mandatory=$false)]
+        [ValidateSet('ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow')]
+        [string]$Preset = 'medium'
     )
     $ErrorActionPreference = 'Stop'
-    $args = @("-y", "-f", "gdigrab", "-framerate", $Fps, "-t", $DurationSec, "-i", "desktop", "-c:v", "libx264", "-preset", "ultrafast", $OutFile)
-    Run-FFmpeg -Arguments $args
+    $encoder = if ($Codec -eq 'h264') { @('-c:v', 'libx264') } else { @('-c:v', 'libx265', '-tag:v', 'hvc1') }
+    $ffmpegArgs = @("-y", "-f", "gdigrab", "-framerate", $Fps, "-t", $DurationSec, "-i", "desktop",
+        "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2") + $encoder + @("-preset", $Preset, "-pix_fmt", "yuv420p", $OutFile)
+    Run-FFmpeg -Arguments $ffmpegArgs
     Write-Host "Screen recording saved to $OutFile"
 }
 

@@ -97,7 +97,7 @@ Prefer control experiments over single passing cases. Frame-rate reporting is ve
 ### FFmpeg Integration
 - Auto-install FFmpeg if not present
 - Use `gdigrab` for screen capture on Windows
-- Prefer `libx264` codec with `ultrafast` preset for speed
+- Record HEVC with `libx265` (preset `medium`) by default; `libx264` (H.264) stays supported as an option
 - Output to MP4 for videos, PNG for screenshots
 
 ### Code Style

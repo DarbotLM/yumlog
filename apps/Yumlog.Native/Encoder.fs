@@ -96,4 +96,4 @@ module HevcEncoder =
                     else "NVENC session/caps probe failed"
                 failwith
                     ($"No usable HEVC encoder: NVENC unavailable ({nvReason}) and x265.dll could not be loaded "
-                     + "(set --x265, YUMLOG_X265_PATH, or place x265.dll at .tools\\x265\\x265.dll).")
+                     + "(set --x265, YUMLOG_X265_PATH, or place x265.dll at .tools\\x265\\x265.dll or <install root>\\tools\\x265\\x265.dll).")

@@ -213,7 +213,7 @@ module NativeExtensibility =
                (schema "image-input")
                (schema "ocr-result")
                [| "ocr"; "on-device"; "windows-app-sdk" |]
-               [| declaredAttribute "ocrModes" "auto,windows-ai,raw-com,none" |]
+               [| declaredAttribute "ocrModes" "auto,windows-ai,raw-com,npu-emulated,none" |]
 
            cliCapability
                "capture-screens"

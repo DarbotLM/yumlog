@@ -129,6 +129,9 @@ module X265Encoder =
           Environment.GetEnvironmentVariable "YUMLOG_X265_PATH" |> orEmptyIfNull
           Path.Combine(Environment.CurrentDirectory, ".tools", "x265", "x265.dll")
           Path.Combine(AppContext.BaseDirectory, ".tools", "x265", "x265.dll")
+          Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", ".tools", "x265", "x265.dll"))
+          // Shared tools beside the version folders (DarbotLabs\Yumlog\tools) survive upgrades.
+          Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "tools", "x265", "x265.dll"))
           Path.Combine(AppContext.BaseDirectory, "x265.dll") ]
         |> List.filter (fun p -> not (String.IsNullOrWhiteSpace p))
 

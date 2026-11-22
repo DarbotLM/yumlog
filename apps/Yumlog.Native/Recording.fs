@@ -42,6 +42,10 @@ module NativeRecording =
           Environment.GetEnvironmentVariable("FFMPEG_PATH") |> Option.ofObj
           Some(Path.Combine(Environment.CurrentDirectory, ".tools", "ffmpeg", "bin", "ffmpeg.exe"))
           Some(Path.Combine(AppContext.BaseDirectory, ".tools", "ffmpeg", "bin", "ffmpeg.exe"))
+          // Installed layout: <version>\.tools beside the component folders.
+          Some(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", ".tools", "ffmpeg", "bin", "ffmpeg.exe")))
+          // Shared tools beside the version folders (DarbotLabs\Yumlog\tools) survive upgrades.
+          Some(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "tools", "ffmpeg", "bin", "ffmpeg.exe")))
           searchToolsDirectories Environment.CurrentDirectory
           searchToolsDirectories AppContext.BaseDirectory
           Some "ffmpeg" ]
@@ -85,6 +89,9 @@ module NativeRecording =
                "-c:v"; config.Encoder
                "-preset"; config.Preset
                "-pix_fmt"; "yuv420p"
+               // hvc1 keeps HEVC-in-MP4 playable by Windows Media Foundation and QuickTime players.
+               if codecOfFfmpegEncoder config.Encoder = "hevc" then "-tag:v"
+               if codecOfFfmpegEncoder config.Encoder = "hevc" then "hvc1"
                outFile |]
 
         let info = ProcessStartInfo()

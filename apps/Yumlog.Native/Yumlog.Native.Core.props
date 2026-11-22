@@ -51,6 +51,7 @@
     <Compile Include="$(YumlogNativeDir)HevcMux.fs" Link="HevcMux.fs" />
     <Compile Include="$(YumlogNativeDir)Recording.fs" Link="Recording.fs" />
     <Compile Include="$(YumlogNativeDir)WindowsAiOcr.fs" Link="WindowsAiOcr.fs" />
+    <Compile Include="$(YumlogNativeDir)NpuEmulatedOcr.fs" Link="NpuEmulatedOcr.fs" />
     <Compile Include="$(YumlogNativeDir)Ocr.fs" Link="Ocr.fs" />
   </ItemGroup>
 

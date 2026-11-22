@@ -34,11 +34,25 @@ module NativeConfig =
         |> Map.remove "duration-preset"
         |> Map.remove "frame-rate-preset"
 
+    /// The working directory's config\ wins (a checkout, or a caller that chose a directory).
+    /// Otherwise use the installed layout: <version>\config beside the component folder
+    /// (<version>\Yumlog.Native\Yumlog.Native.exe), then config\ beside the executable.
+    /// Start-menu shortcuts start in the component folder, where no config\ exists.
+    let private resolveConfigRelative (relative: string) =
+        let baseDirectory = AppContext.BaseDirectory
+        let candidates =
+            [ Path.Combine("config", relative)
+              Path.GetFullPath(Path.Combine(baseDirectory, "..", "config", relative))
+              Path.Combine(baseDirectory, "config", relative) ]
+        candidates
+        |> List.tryFind (fun candidate -> File.Exists(candidate) || Directory.Exists(candidate))
+        |> Option.defaultValue (Path.Combine("config", relative))
+
     let defaultConfigPath =
-        Path.Combine("config", "yumlog.native.json")
+        resolveConfigRelative "yumlog.native.json"
 
     let defaultExtensionsDir =
-        Path.Combine("config", "extensions")
+        resolveConfigRelative "extensions"
 
     let defaults =
         { Capture =
@@ -53,7 +67,7 @@ module NativeConfig =
               Fps = 30
               DurationSec = 10
               FFmpegPath = ""
-              Encoder = "hevc"
+              Encoder = "libx265"
               Preset = "medium"
               // FFmpeg is the default media backend until the Yumlog codec ships.
               Backend = "ffmpeg"
@@ -179,27 +193,59 @@ module NativeConfig =
         let normalizeCodec (value: string) =
             match (orEmptyIfNull value).Trim().ToLowerInvariant() with
             | "" | "hevc" | "h265" -> "hevc"
-            | other -> invalidArg "codec" $"Unsupported codec '{other}'. Only hevc is implemented."
+            | "h264" | "avc" -> "h264"
+            | other -> invalidArg "codec" $"Unsupported codec '{other}'. Use hevc (default) or h264."
 
-        { baseConfig with
-            OutFile =
-                match overrides |> Map.tryFind "out" with
-                | Some (value: string) when not (String.IsNullOrWhiteSpace(value)) -> value
-                | _ -> get "out-file" baseConfig.OutFile
-            Fps = get "fps" (string baseConfig.Fps) |> Int32.Parse
-            DurationSec = get "duration" (string baseConfig.DurationSec) |> Int32.Parse
-            FFmpegPath = get "ffmpeg" baseConfig.FFmpegPath
-            Encoder = get "encoder" baseConfig.Encoder
-            Preset = get "preset" baseConfig.Preset |> normalizePreset
-            Backend = get "backend" baseConfig.Backend |> normalizeRecordBackend
-            Codec = get "codec" baseConfig.Codec |> normalizeCodec
-            Lossless = getBool "lossless" baseConfig.Lossless
-            Container = get "container" baseConfig.Container |> normalizeContainer
-            X265Path = get "x265" baseConfig.X265Path
-            CaptureBackend = get "capture-backend" baseConfig.CaptureBackend |> normalizeCaptureBackend
-            MonitorIndex = get "monitor-index" (string baseConfig.MonitorIndex) |> Int32.Parse
-            DisableCaptureBorder = getBool "disable-capture-border" baseConfig.DisableCaptureBorder
-            TimedMetadataOut = get "timed-metadata-out" baseConfig.TimedMetadataOut }
+        let merged =
+            { baseConfig with
+                OutFile =
+                    match overrides |> Map.tryFind "out" with
+                    | Some (value: string) when not (String.IsNullOrWhiteSpace(value)) -> value
+                    | _ -> get "out-file" baseConfig.OutFile
+                Fps = get "fps" (string baseConfig.Fps) |> Int32.Parse
+                DurationSec = get "duration" (string baseConfig.DurationSec) |> Int32.Parse
+                FFmpegPath = get "ffmpeg" baseConfig.FFmpegPath
+                Encoder = get "encoder" baseConfig.Encoder
+                Preset = get "preset" baseConfig.Preset |> normalizePreset
+                Backend = get "backend" baseConfig.Backend |> normalizeRecordBackend
+                Codec = get "codec" baseConfig.Codec |> normalizeCodec
+                Lossless = getBool "lossless" baseConfig.Lossless
+                Container = get "container" baseConfig.Container |> normalizeContainer
+                X265Path = get "x265" baseConfig.X265Path
+                CaptureBackend = get "capture-backend" baseConfig.CaptureBackend |> normalizeCaptureBackend
+                MonitorIndex = get "monitor-index" (string baseConfig.MonitorIndex) |> Int32.Parse
+                DisableCaptureBorder = getBool "disable-capture-border" baseConfig.DisableCaptureBorder
+                TimedMetadataOut = get "timed-metadata-out" baseConfig.TimedMetadataOut }
+
+        // Encoder names an FFmpeg implementation; codec names the bitstream. Codec-only
+        // names map to the software encoder for that codec, and a pair that disagrees
+        // (libx264 with hevc) is refused instead of silently recording the wrong codec.
+        let codecOnly = overrides |> Map.containsKey "codec" && not (overrides |> Map.containsKey "encoder")
+        let encoder =
+            match (orEmptyIfNull merged.Encoder).Trim().ToLowerInvariant() with
+            | _ when codecOnly -> if merged.Codec = "h264" then "libx264" else "libx265"
+            | "" -> if merged.Codec = "h264" then "libx264" else "libx265"
+            | "hevc" | "h265" | "x265" -> "libx265"
+            | "h264" | "avc" | "x264" -> "libx264"
+            | other -> other
+        let encoderCodec =
+            match encoder with
+            | "libx264" | "h264_nvenc" | "h264_qsv" | "h264_amf" | "h264_mf" -> Some "h264"
+            | "libx265" | "hevc_nvenc" | "hevc_qsv" | "hevc_amf" | "hevc_mf" -> Some "hevc"
+            | _ -> None
+        // An encoder named but a codec left at its default follows the encoder (h264 opt-in).
+        let codecExplicit = overrides |> Map.containsKey "codec"
+        let codec =
+            match encoderCodec with
+            | Some c when c <> merged.Codec && not codecExplicit && merged.Codec = "hevc" && c = "h264" -> c
+            | _ -> merged.Codec
+        match encoderCodec with
+        | Some c when c <> codec ->
+            invalidArg "encoder" $"Encoder '{encoder}' produces {c}, but codec is '{codec}'. Use libx265 with hevc (default) or libx264 with h264."
+        | _ -> ()
+        if codec = "h264" && merged.Backend <> "ffmpeg" then
+            invalidArg "codec" "h264 is recorded only by the ffmpeg backend; use --backend ffmpeg or codec hevc."
+        { merged with Encoder = encoder; Codec = codec }
 
     let mergeAnalyze (baseConfig: AnalyzeConfig) overrides =
         let get name fallback =

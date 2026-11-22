@@ -10,14 +10,15 @@ Yumlog.Native.Cli
 Usage:
   Yumlog.Native.Cli capture [--config path] [--out-dir path] [--fps n] [--duration n] [--count n] [--primary]
   Yumlog.Native.Cli record [--duration-preset 5s|15s|30s|1m|2m|3m|5m|10m|15m|30m|45m|60m|90m|120m] [--frame-rate-preset 24|25|30|50|60|120] [--config path] [--out-file path] [--fps n] [--duration n]
-                           [--backend auto|nvenc|x265|ffmpeg] [--lossless true|false] [--preset name]
+                           [--backend auto|nvenc|x265|ffmpeg] [--encoder libx265|libx264] [--codec hevc|h264]
+                           [--ffmpeg path] [--lossless true|false] [--preset name]
                            [--container mp4] [--x265 path] [--capture-backend wgc]
                            [--monitor-index n] [--disable-capture-border true|false]
                            [--timed-metadata-out path]
-  Yumlog.Native.Cli analyze [--config path] [--input path] [--ocr none|auto|windows-ai|raw-com] [--json-out path]
+  Yumlog.Native.Cli analyze [--config path] [--input path] [--ocr none|auto|windows-ai|raw-com|npu-emulated] [--json-out path]
   Yumlog.Native.Cli follow [--config path] [--out-dir path] [--fps n] [--duration n] [--change-threshold n] [--ocr mode]
-  Yumlog.Native.Cli handoff --input path --out-dir path [--ocr none|auto|windows-ai|raw-com] [--resume]
-  Yumlog.Native.Cli readiness --ocr none|auto|windows-ai|raw-com
+  Yumlog.Native.Cli handoff --input path --out-dir path [--ocr none|auto|windows-ai|raw-com|npu-emulated] [--resume]
+  Yumlog.Native.Cli readiness --ocr none|auto|windows-ai|raw-com|npu-emulated
   Yumlog.Native.Cli orchestrate --plan path
   Yumlog.Native.Cli config show [--config path]
   Yumlog.Native.Cli config init [--config path] [--force]
@@ -54,11 +55,18 @@ gen-audio (speak, transcribe):
   Runs darbotlabs/gen-audio's CLIs through Python. Defaults come from GEN_AUDIO_PYTHON, GEN_AUDIO_ROOT,
   YUMLOG_GEN_AUDIO_ENGINE (kokoro_onnx), YUMLOG_GEN_AUDIO_VOICE and GEN_AUDIO_VIBEVOICE_ASR_MODEL.
 
-  Yumlog.Native.Cli handoff --input path --out-dir path [--ocr none|auto|windows-ai|raw-com] [--resume]
-  Yumlog.Native.Cli readiness --ocr none|auto|windows-ai|raw-com
-  Yumlog.Native.Cli extensions list [--config path] [--dir path] [--kind kind] [--name text] [--no-builtin] [--no-external]
-  Yumlog.Native.Cli extensions mcp [--config path] [--dir path] [--no-builtin] [--no-external]
-  Yumlog.Native.Cli extensions validate [--config path] [--dir path] [--pattern glob]
+record encoding:
+  Default is HEVC through libx265 (--encoder libx265 --codec hevc). H.264 stays available with
+  --backend ffmpeg --encoder libx264 --codec h264. A mismatched encoder and codec is refused.
+
+OCR (--ocr):
+  auto uses Windows AI OCR when it is Ready and otherwise the NPU emulator's CPU target
+  (npu-emulated, Windows.Media.Ocr), so OCR works on boxes without an NPU.
+
+config:
+  Without --config, config\yumlog.native.json is read from the working directory, then from the
+  installed <version>\config folder beside Yumlog.Native.Cli\ and Yumlog.Native\.
+
 Extension kinds:
   model, agent, tool, skill, workflow, connector, plugin, extension, mcp-server, api, continuous-ai
 """
@@ -155,7 +163,7 @@ Extension kinds:
         | "handoff" :: args ->
             Handoff(parseHandoff args)
         | [ "readiness"; "--ocr"; mode ] -> Readiness mode
-        | "readiness" :: _ -> invalidArg "args" "Usage: readiness --ocr none|auto|windows-ai|raw-com"
+        | "readiness" :: _ -> invalidArg "args" "Usage: readiness --ocr none|auto|windows-ai|raw-com|npu-emulated"
         | "follow" :: args ->
             let configPath, options = parseOptions args
             ensureOptions "follow" [ "out-dir"; "fps"; "duration"; "change-threshold"; "ocr"; "stop-on-idle" ] options
