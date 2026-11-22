@@ -270,7 +270,7 @@ public sealed class FoundryLocalPipelineService
 
     private static VisualContent ResizeImageForInference(byte[] bytes)
     {
-        const int maxDimension = 512;
+        const int maxDimension = 256;
         const int maxPixels = 40_000_000;
         using var input = new MemoryStream(bytes, writable: false);
         using var source = Image.FromStream(input);
@@ -330,6 +330,8 @@ public sealed class FoundryLocalPipelineService
         var request = new JsonObject
         {
             ["model"] = model,
+            ["max_output_tokens"] = 128,
+            ["temperature"] = 0,
             ["input"] = new JsonArray
             {
                 new JsonObject
