@@ -331,12 +331,54 @@ module StudioSemantic =
         let runbookPath = Path.Combine(output, "semantic-runbook.json")
         NativeJson.write runbookPath runbook
         if FileHash.sha256 videoPath <> source.Sha256 then invalidOp "The source recording changed during processing."
+        // AgentCard 3.1 (DarbotLM/ac3.1): kind, version and allowed fields come from the
+        // embedded schema; ids, names and requirements from the decimation profile.
+        let cardSchema = AgentCard31.schema ()
+        let cardProfile = AgentCard31.profile ()
+        let agentCardPath = Path.Combine(output, cardProfile.FileName)
+        let knowledge : AgentCard31.KnowledgeFile array =
+            [| "Atomic library", libraryPath, "Evidence-linked atomic flipcards (urn:yumlog:atomic-library:v1)."
+               "Bitdot layers", layersPath, "One-second occupancy layers (urn:yumlog:bitdot-layers:v1)."
+               "Semantic runbook", runbookPath, "MDKG runbook with re-resolvable proofs."
+               "Transcript", transcript, "Timestamped transcript used for speech cards." |]
+            |> Array.map (fun (name, path, description) ->
+                { AgentCard31.KnowledgeFile.Name = name
+                  AgentCard31.KnowledgeFile.Path = path
+                  AgentCard31.KnowledgeFile.Sha256 = FileHash.sha256 path
+                  AgentCard31.KnowledgeFile.Description = description })
+        let topics : AgentCard31.TopicSeed array =
+            cards
+            |> Seq.groupBy (fun card -> card.Modality)
+            |> Seq.sortBy fst
+            |> Seq.map (fun (modality, members) ->
+                let members : Card array = Seq.toArray members
+                let phrases =
+                    members
+                    |> Array.collect (fun card -> card.Tags)
+                    |> Array.countBy id
+                    |> Array.sortBy (fun (tag, count) -> -count, tag)
+                    |> Array.map fst
+                { AgentCard31.TopicSeed.Modality = modality
+                  AgentCard31.TopicSeed.CardCount = members.Length
+                  AgentCard31.TopicSeed.Phrases = phrases })
+            |> Seq.toArray
+        let facts =
+            [| "generator", "Yumlog Studio semantic decimation"
+               "durationSeconds", media.Duration.ToString("R", CultureInfo.InvariantCulture)
+               "cardCount", string cards.Count
+               "visualFrames", string frames.Length
+               "transcriptCues", string cues.Length
+               "transcriptSha256", transcriptHash
+               "atomicLibrary", orEmptyIfNull (Path.GetFileName(libraryPath)) |]
+        AgentCard31.build cardSchema cardProfile videoPath source.Sha256 knowledge topics facts
+        |> AgentCard31.write cardSchema agentCardPath
         NativeJson.write reportPath
             {| schema = "urn:yumlog:semantic-report:v1"; complete = true; source = source; durationSeconds = media.Duration
                scope = "Entire source decoded for scene changes; all timestamped speech indexed. Sparse indexing does not guarantee recognition of every semantic object."
                transcriptEndpointPolicy = "Source bytes retained. Speech endpoints up to 250 ms beyond media duration are clamped in indexed cues; larger drift or starts beyond media are rejected."
                transcriptReused = reused; transcriptCues = cues.Length; visualFrames = frames.Length; audioSegments = groups.Length
                attachedDocuments = documentCount; classicOcrFrames = ocrFrames; classicOcrStatus = ocrStatus
+               agentCard = orEmptyIfNull (Path.GetFileName(agentCardPath)); agentCardSchema = cardSchema.Id
                cardCount = cards.Count; layerRuns = runs.Count; indexedSeconds = binCount; mdkgProofs = verification.TotalProofs
                sourceUnchanged = true
                limitations = [| "No vision-language model, diarization or acoustic emotion model was used; classic Windows OCR is best-effort."
@@ -351,5 +393,6 @@ module StudioSemantic =
         addArtifact "timedMetadata" mdkgPath (Nullable()) (Nullable())
         addArtifact "runbook" runbookPath (Nullable()) (Nullable())
         addArtifact "schema" schemaPath (Nullable()) (Nullable())
+        addArtifact "agentCard" agentCardPath (Nullable()) (Nullable())
         addArtifact "semanticReport" metadataFile (Nullable()) (Nullable())
         { Artifacts = artifacts.ToArray(); LibraryPath = libraryPath; ReportPath = reportPath; CardCount = cards.Count }

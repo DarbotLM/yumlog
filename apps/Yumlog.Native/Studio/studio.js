@@ -6,7 +6,7 @@ const media = id => "https://yumlog-media.local/" + encodeURIComponent(id);
 const tabIcons = { video: "\uE714", screenshot: "\uE722", audio: "\uE767", transcript: "\uE8A5",
   agents: "\uE716", voices: "\uE720", insights: "\uE9D9", harvest: "\uE7B8", settings: "\uE713", library: "\uE8F1" };
 const outputLabels = { clip: "Clip", screenshot: "Screenshot", frame: "Frame", audio: "Audio", spectrogram: "Spectrogram",
-  transcript: "Transcript", voice: "Narration", ocr: "Frame analysis", runbook: "MDKG runbook", timedMetadata: "Timed metadata", atomicLibrary: "Atomic library", semanticReport: "Semantic report", bitdot: "Bitdot layers", document: "Source document", schema: "Atomic card schema",
+  transcript: "Transcript", voice: "Narration", ocr: "Frame analysis", runbook: "MDKG runbook", timedMetadata: "Timed metadata", atomicLibrary: "Atomic library", semanticReport: "Semantic report", bitdot: "Bitdot layers", document: "Source document", schema: "Atomic card schema", agentCard: "AgentCard 3.1",
   agentVoice: "Speaker excerpts", agentVoices: "Agent Voices timeline" };
 const backLabels = { video: "Video inputs and clips", screenshot: "Screenshot inputs and frames",
   audio: "Audio outputs", transcript: "Transcript sources", agents: "Agent capabilities", voices: "Agent Voices and narration",

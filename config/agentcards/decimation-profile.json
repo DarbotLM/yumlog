@@ -1,0 +1,19 @@
+{
+  "profile": "urn:yumlog:agentcard-profile:decimation:v1",
+  "schemaResource": "Yumlog.AgentCard31.Schema.json",
+  "fileName": "agent-card.json",
+  "idPrefix": "labs.darbot.yumlog.decimation",
+  "idHashLength": 16,
+  "language": "en-US",
+  "namePrefix": "Yumlog Library",
+  "requires": {
+    "yumlog.atomic-library": "1.0",
+    "yumlog.bitdot-layers": "1.0"
+  },
+  "knowledgeKind": "DocumentLibrary",
+  "topicKind": "AdaptiveDialog",
+  "topicTriggerKind": "OnIntent",
+  "topicActionKind": "SendMessage",
+  "maxPhrasesPerTopic": 8,
+  "instructions": "Answer questions about one recording from its Yumlog semantic Library. Cite card ids, time ranges and SHA-256 hashes from the evidence files. Treat values marked unknown as unknown, and say so instead of guessing."
+}

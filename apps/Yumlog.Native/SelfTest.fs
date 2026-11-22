@@ -486,8 +486,67 @@ module NativeSelfTest =
                 false, error.Message
         [| check "process.children.killedOnExit" passed detail |]
 
+    let private agentCard31 () =
+        // Semantic decimation emits DarbotLM/ac3.1 AgentCard 3.1 documents. The card
+        // format comes from the embedded schema, so these checks exercise that schema.
+        let schemaCase, emitCase, rejectCase, versionCase =
+            try
+                let schema = AgentCard31.schema ()
+                let profile = AgentCard31.profile ()
+                let schemaOk = schema.Kind = "CopilotStudioAgentCard" && schema.Version = "3.1"
+                let directory = Path.Combine(Path.GetTempPath(), "yumlog-agentcard31-selftest-" + Guid.NewGuid().ToString("N"))
+                Directory.CreateDirectory(directory) |> ignore
+                try
+                    let evidence = Path.Combine(directory, "atomic-library.json")
+                    File.WriteAllText(evidence, "{\"cards\":[]}")
+                    let sha = String('a', 64)
+                    let knowledge : AgentCard31.KnowledgeFile array =
+                        [| { Name = "Atomic library"; Path = evidence; Sha256 = AgentCard31.sha256File evidence; Description = "self-test" } |]
+                    let topics : AgentCard31.TopicSeed array =
+                        [| { Modality = "audio"; CardCount = 2; Phrases = [| "decimation"; "decimation"; "speech" |] }
+                           { Modality = "video"; CardCount = 0; Phrases = [||] } |]
+                    let card = AgentCard31.build schema profile (Path.Combine(directory, "sample.mp4")) sha knowledge topics [| "cardCount", "2" |]
+                    let cardPath = Path.Combine(directory, profile.FileName)
+                    AgentCard31.write schema cardPath card
+                    let reread = Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(cardPath))
+                    let rereadErrors =
+                        match reread with
+                        | null -> [| "card did not parse" |]
+                        | node -> AgentCard31.validate node
+                    let emitOk = rereadErrors.Length = 0 && string card["kind"] = schema.Kind && string card["schemaVersion"] = schema.Version
+                    let broken = card.DeepClone()
+                    let brokenErrors =
+                        match broken with
+                        | :? Text.Json.Nodes.JsonObject as bad ->
+                            bad["kind"] <- Text.Json.Nodes.JsonValue.Create("Other")
+                            bad["unexpected"] <- Text.Json.Nodes.JsonValue.Create(1)
+                            match bad["metadata"] with
+                            | :? Text.Json.Nodes.JsonObject as metadata -> metadata["count"] <- Text.Json.Nodes.JsonValue.Create(2)
+                            | _ -> ()
+                            bad.Remove("name") |> ignore
+                            AgentCard31.validate bad
+                        | _ -> [||]
+                    let rejectOk = brokenErrors.Length = 4
+                    let mismatch =
+                        """{"$id":"https://x/agent-card/9.9/s.json","properties":{"kind":{"const":"K"},"schemaVersion":{"examples":["3.1"]}}}"""
+                    let versionOk =
+                        try AgentCard31.parseSchema mismatch |> ignore; false
+                        with :? InvalidOperationException -> true
+                    let rereadText = String.Join("; ", rereadErrors)
+                    let brokenText = String.Join("; ", brokenErrors)
+                    check "agentcard31.schema.embedded" schemaOk $"kind={schema.Kind} version={schema.Version} id={schema.Id}",
+                    check "agentcard31.emit.validates" emitOk $"{profile.FileName}: {rereadErrors.Length} violations ({rereadText})",
+                    check "agentcard31.validator.rejects" rejectOk $"{brokenErrors.Length} violations: {brokenText}",
+                    check "agentcard31.schema.versionMismatchRejected" versionOk "a schema whose $id version differs from its schemaVersion example is refused"
+                finally
+                    try Directory.Delete(directory, true) with _ -> ()
+            with error ->
+                let failed name = check name false error.Message
+                failed "agentcard31.schema.embedded", failed "agentcard31.emit.validates", failed "agentcard31.validator.rejects", failed "agentcard31.schema.versionMismatchRejected"
+        [| schemaCase; emitCase; rejectCase; versionCase |]
+
     let run (sampleOut: string) =
-        let cases = Array.concat [ mdkgRoundTrip sampleOut; encoderProbe (); childCleanup () ]
+        let cases = Array.concat [ mdkgRoundTrip sampleOut; agentCard31 (); encoderProbe (); childCleanup () ]
         let failed = cases |> Array.filter (fun case -> not case.Passed)
 
         { Passed = failed.Length = 0
