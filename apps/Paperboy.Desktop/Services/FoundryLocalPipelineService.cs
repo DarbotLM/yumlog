@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -210,7 +213,7 @@ public sealed class FoundryLocalPipelineService
         if (mediaKind == "image" && file.Length <= options.MaxImageBytes)
         {
             var bytes = await File.ReadAllBytesAsync(file.FullName, cancellationToken);
-            return new VisualContent(Convert.ToBase64String(bytes), GetImageMime(file.Extension));
+            return await Task.Run(() => ResizeImageForInference(bytes), cancellationToken);
         }
 
         if (mediaKind == "video" && options.SampleVideoFrames)
@@ -263,6 +266,39 @@ public sealed class FoundryLocalPipelineService
         }
 
         return null;
+    }
+
+    private static VisualContent ResizeImageForInference(byte[] bytes)
+    {
+        const int maxDimension = 512;
+        const int maxPixels = 40_000_000;
+        using var input = new MemoryStream(bytes, writable: false);
+        using var source = Image.FromStream(input);
+        if (source.Width * (long)source.Height > maxPixels)
+        {
+            throw new InvalidDataException(
+                $"Image dimensions {source.Width}x{source.Height} exceed the tagging safety limit.");
+        }
+
+        var scale = Math.Min(1d, maxDimension / (double)Math.Max(source.Width, source.Height));
+        var width = Math.Max(1, (int)Math.Round(source.Width * scale));
+        var height = Math.Max(1, (int)Math.Round(source.Height * scale));
+        using var thumbnail = new Bitmap(width, height);
+        using (var graphics = Graphics.FromImage(thumbnail))
+        {
+            graphics.CompositingQuality = CompositingQuality.HighQuality;
+            graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            graphics.SmoothingMode = SmoothingMode.HighQuality;
+            graphics.DrawImage(source, 0, 0, width, height);
+        }
+
+        var codec = ImageCodecInfo.GetImageDecoders()
+            .Single(item => item.FormatID == ImageFormat.Jpeg.Guid);
+        using var parameters = new EncoderParameters(1);
+        parameters.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 82L);
+        using var output = new MemoryStream();
+        thumbnail.Save(output, codec, parameters);
+        return new VisualContent(Convert.ToBase64String(output.ToArray()), "image/jpeg");
     }
 
     private static async Task<string> CallResponsesAsync(Uri endpoint, string model, string prompt, VisualContent? visual, CancellationToken cancellationToken)
@@ -384,15 +420,6 @@ public sealed class FoundryLocalPipelineService
         var hash = await SHA256.HashDataAsync(stream, cancellationToken);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
-
-    private static string GetImageMime(string extension) => extension.ToLowerInvariant() switch
-    {
-        ".png" => "image/png",
-        ".gif" => "image/gif",
-        ".bmp" => "image/bmp",
-        ".webp" => "image/webp",
-        _ => "image/jpeg"
-    };
 
     private static string? ResolveFfmpeg()
     {
