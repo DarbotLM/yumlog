@@ -115,7 +115,12 @@ module NativeUi =
                 | :? UnauthorizedAccessException -> respond Stream.Null 404 "Not Found" baseHeaders
             | None -> respond Stream.Null 404 "Not Found" baseHeaders
 
-    let internal runWorkspace appRoot =
+    /// Release pages the Studio banner may open (the update check's own link only).
+    let private isReleaseLink (url: string) (settings: UpdateCheck.UpdateSettings) =
+        Uri.IsWellFormedUriString(url, UriKind.Absolute)
+        && url.StartsWith(settings.WebBase.TrimEnd('/') + "/" + settings.Repo + "/releases", StringComparison.OrdinalIgnoreCase)
+
+    let internal runWorkspaceWith (appRoot: string) (startupActions: string list) =
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2) |> ignore
         Application.EnableVisualStyles()
         Application.SetCompatibleTextRenderingDefault(false)
@@ -125,6 +130,10 @@ module NativeUi =
         use browser = new WebView2(Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(17, 20, 25))
         form.Controls.Add(browser)
         let mutable busy = false
+        let updateSettings = UpdateCheck.load ()
+        let mutable updateResult: UpdateCheck.UpdateResult option = None
+        let mutable pageReady = false
+        let mutable noticePosted = false
 
         let chooseFiles multi filter =
             use dialog = new OpenFileDialog(Multiselect = multi, Filter = filter, CheckFileExists = true)
@@ -159,12 +168,18 @@ module NativeUi =
                     let command = DesktopLibrary.field "command" payload
                     let requestId = DesktopLibrary.field "requestId" payload
                     let post response = core.PostWebMessageAsJson(NativeJson.serialize response)
-                    if busy then
+                    if command = "openRelease" then
+                        match updateResult with
+                        | Some value when isReleaseLink value.Url updateSettings ->
+                            Diagnostics.Process.Start(Diagnostics.ProcessStartInfo(value.Url, UseShellExecute = true)) |> ignore
+                            post {| requestId = requestId; message = "Opened the release page." |}
+                        | _ -> post {| requestId = requestId; error = "No release page to open." |}
+                    elif busy then
                         post {| requestId = requestId; error = "Another tool is running." |}
                     else
                         busy <- true
                         let previous = form.WindowState
-                        let capture = command = "capture" || command = "record"
+                        let capture = command = "capture" || command = "record" || command = "systemSpecs"
                         try
                             try
                                 if command = "copyCard" || command = "copySchema" then
@@ -195,6 +210,42 @@ module NativeUi =
                             busy <- false
                 } |> ignore
 
+        // Update notice: posted once, after both the page and the check are ready (either may finish first).
+        let postNotice (core: CoreWebView2) =
+            match updateResult with
+            | Some value when pageReady && not noticePosted ->
+                noticePosted <- true
+                core.PostWebMessageAsJson(NativeJson.serialize {| updateNotice = value |})
+            | _ -> ()
+
+        let runStartupActions (core: CoreWebView2) =
+            for action in startupActions do
+                // Same path as the Studio button; results go to the Studio log for unattended runs.
+                task {
+                    let logs = Directory.CreateDirectory(Path.Combine(Path.GetDirectoryName(appRoot.TrimEnd('\\', '/')) |> nonNull, "logs")).FullName
+                    let line (text: string) =
+                        try File.AppendAllText(Path.Combine(logs, "studio-actions.log"), $"{DateTimeOffset.Now:O} {text}{Environment.NewLine}") with _ -> ()
+                    while busy do
+                        do! Task.Delay(250)
+                    busy <- true
+                    let previous = form.WindowState
+                    form.WindowState <- FormWindowState.Minimized
+                    try
+                        try
+                            do! Task.Delay(500)
+                            let! outcome, state =
+                                Task.Run(fun () ->
+                                    let outcome = workspace.Run(action, JsonDocument.Parse("{}").RootElement, [||])
+                                    outcome, workspace.Snapshot())
+                            let detail = (NativeJson.serialize outcome.data).Replace(Environment.NewLine, " ")
+                            line $"{action} ok: {outcome.message} {detail}"
+                            core.PostWebMessageAsJson(NativeJson.serialize {| requestId = "startup-" + action; message = outcome.message; data = outcome.data; state = state |})
+                        with error -> line $"{action} failed: {error.GetType().Name}: {error.Message}"
+                    finally
+                        form.WindowState <- previous
+                        busy <- false
+                } |> ignore
+
         form.FormClosed.Add(fun _ -> ChildProcesses.killAll())
 
         form.FormClosing.Add(fun event ->
@@ -219,7 +270,23 @@ module NativeUi =
                     core.AddWebResourceRequestedFilter(mediaHost + "*", CoreWebView2WebResourceContext.All, CoreWebView2WebResourceRequestSourceKinds.Document)
                     core.WebResourceRequested.Add(serveMedia workspace core)
                     core.WebMessageReceived.Add(onMessage core)
+                    core.NavigationCompleted.Add(fun _ ->
+                        if not pageReady then
+                            pageReady <- true
+                            postNotice core
+                            runStartupActions core)
                     core.Navigate(studioPage)
+                    // Launch-time update check: background, short timeout, silent when offline or disabled.
+                    task {
+                        let! value = UpdateCheck.check updateSettings (UpdateCheck.currentVersion ())
+                        UpdateCheck.record value
+                        if not form.IsDisposed then
+                            try
+                                form.BeginInvoke(Action(fun () ->
+                                    updateResult <- Some value
+                                    postNotice core)) |> ignore
+                            with :? ObjectDisposedException | :? InvalidOperationException -> ()
+                    } |> ignore
                 with error ->
                     MessageBox.Show(form, $"Could not open Yumlog Studio. Check that Microsoft Edge WebView2 Runtime is installed.\n\n{error.Message}",
                                     "Yumlog Studio", MessageBoxButtons.OK, MessageBoxIcon.Error) |> ignore
@@ -228,6 +295,19 @@ module NativeUi =
 
         Application.Run(form)
 
-    let run () =
-        let localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
-        runWorkspace (Path.Combine(localAppData, "DarbotLabs", "Yumlog", "Studio"))
+    /// Studio with no queued actions (the smoke host calls this by reflection).
+    let internal runWorkspace (appRoot: string) = runWorkspaceWith appRoot []
+
+    /// Command-line switches that queue Studio actions after the page loads (for unattended capture):
+    ///   --capture-specs   run "Capture system specs" (Settings > System > About plus spec tags)
+    let startupActions (argv: string array) =
+        argv
+        |> Array.choose (fun arg ->
+            match arg.Trim().ToLowerInvariant() with
+            | "--capture-specs" | "/capture-specs" -> Some "systemSpecs"
+            | _ -> None)
+        |> Array.distinct
+        |> Array.toList
+
+    let run (argv: string array) =
+        runWorkspaceWith (Path.Combine(UpdateCheck.dataRoot (), "Studio")) (startupActions argv)

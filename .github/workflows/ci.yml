@@ -75,6 +75,8 @@ jobs:
         run: .\launchers\Test-YumlogReviewTools.ps1
       - name: gen-audio speech and transcription boundary
         run: .\launchers\Test-YumlogGenAudio.ps1
+      - name: System specs and offline update check
+        run: .\launchers\Test-YumlogSystemSpecs.ps1
       - name: Agent client protocol contracts
         run: .\launchers\Test-YumlogAgentProtocol.ps1 -DotnetPath dotnet
       - name: Native CLI self-test

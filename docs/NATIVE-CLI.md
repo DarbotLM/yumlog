@@ -160,3 +160,15 @@ override. `config init --force` rewrites the file.
   last `}` before parsing.
 - The unpackaged executable reports OCR `CapabilityMissing` by design; Windows AI
   OCR needs package identity with `systemAIModels`.
+
+## update-check and specs (0.7.0)
+
+```powershell
+Yumlog.Native.Cli update-check [--repo owner/name] [--api url] [--timeout-ms n] [--json-out path]
+Yumlog.Native.Cli specs [--out-dir path] [--capture-method auto|printwindow|screen] [--collect-only true] [--json-out path]
+Yumlog.Native.exe --capture-specs   # Studio: capture Settings > System > About into the library after launch
+```
+
+Both read the `update` and `specs` sections of `config\yumlog.native.json`, then
+`%LOCALAPPDATA%\DarbotLabs\Yumlog\yumlog.settings.json`, then `YUMLOG_UPDATE_*` / `YUMLOG_SPECS_*`.
+Studio runs the update check on every launch; results go to `<data root>\logs\update-check.log`.

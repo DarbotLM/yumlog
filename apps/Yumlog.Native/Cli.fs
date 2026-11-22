@@ -38,6 +38,17 @@ Usage:
                           [--language code] [--python path] [--gen-audio-root dir] [--json-out path]
   Yumlog.Native.Cli transcribe --input audio.wav [--model vibevoice-asr-dir] [--device cpu|cuda]
                                [--srt-out path] [--json-out path] [--python path] [--gen-audio-root dir]
+  Yumlog.Native.Cli version | --version
+  Yumlog.Native.Cli update-check [--repo owner/name] [--api url] [--timeout-ms n] [--json-out path]
+  Yumlog.Native.Cli specs [--out-dir path] [--uri ms-settings:about] [--window-title text] [--window-class name]
+                          [--wait-ms n] [--settle-ms n] [--capture-method auto|printwindow|screen]
+                          [--collect-only true] [--json-out path]
+
+update-check, specs:
+  Settings come from the "update" and "specs" sections of config\yumlog.native.json, then
+  %LOCALAPPDATA%\DarbotLabs\Yumlog\yumlog.settings.json, then YUMLOG_UPDATE_* / YUMLOG_SPECS_* variables.
+  specs saves <stem>-<time>.png and <stem>-<time>.specs.json under the Studio library
+  (<data root>\Studio\Exports\SystemSpecs) unless --out-dir is given.
 
 gen-audio (speak, transcribe):
   Runs darbotlabs/gen-audio's CLIs through Python. Defaults come from GEN_AUDIO_PYTHON, GEN_AUDIO_ROOT,
@@ -119,6 +130,7 @@ Extension kinds:
         match Array.toList argv with
         | [] -> Help
         | "help" :: _ | "--help" :: _ | "-h" :: _ -> Help
+        | "version" :: _ | "--version" :: _ | "-v" :: _ -> ShowVersion
         | "capture" :: args ->
             let configPath, options = parseOptions args
             ensureOptions "capture" [ "out-dir"; "fps"; "duration"; "count"; "primary"; "format" ] options
@@ -210,6 +222,14 @@ Extension kinds:
             ensureOptions "transcribe" [ "input"; "model"; "device"; "srt-out"; "json-out"; "python"; "gen-audio-root" ] options
             if not (options.ContainsKey "input") then invalidArg "input" "Missing --input path to a WAV file."
             Transcribe options
+        | "update-check" :: args ->
+            let _, options = parseOptions args
+            ensureOptions "update-check" [ "repo"; "api"; "timeout-ms"; "json-out" ] options
+            UpdateCheckRun options
+        | "specs" :: args ->
+            let _, options = parseOptions args
+            ensureOptions "specs" [ "out-dir"; "uri"; "window-title"; "window-class"; "wait-ms"; "settle-ms"; "capture-method"; "collect-only"; "json-out" ] options
+            Specs options
         | "models" :: args ->
             let configPath, options = parseOptions args
             ensureOptions "models" [] options

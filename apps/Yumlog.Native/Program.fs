@@ -6,7 +6,7 @@ open System.Windows.Forms
 
 module Program =
     [<STAThread; EntryPoint>]
-    let main _ =
+    let main argv =
         let mutable createdNew = false
         use instanceMutex = new Mutex(true, @"Local\DarbotLabs.Yumlog.Native", &createdNew)
         if not createdNew then
@@ -17,7 +17,7 @@ module Program =
             AppDomain.CurrentDomain.ProcessExit.Add(fun _ -> ChildProcesses.killAll())
             try
                 WinAppRuntime.tryInitialize() |> ignore
-                NativeUi.run()
+                NativeUi.run argv
                 ChildProcesses.killAll()
                 WinAppRuntime.shutdown()
                 0

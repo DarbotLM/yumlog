@@ -37,6 +37,20 @@ if (Test-Path -LiteralPath $versionRoot) {
 
 New-Item -ItemType Directory -Path $versionRoot -Force | Out-Null
 Copy-Item -Path (Join-Path $PackagePath '*') -Destination $versionRoot -Recurse -Force
+# Packages up to 0.6.0 carry a CLI apphost without its dll in the Studio folder; it fails with
+# "The application to execute does not exist". Drop that stub; the real CLI lives in Yumlog.Native.Cli.
+$studioRoot = Join-Path $versionRoot 'Yumlog.Native'
+if (-not (Test-Path -LiteralPath (Join-Path $studioRoot 'Yumlog.Native.Cli.dll'))) {
+    foreach ($stubName in @('Yumlog.Native.Cli.exe', 'Yumlog.Native.Cli.deps.json', 'Yumlog.Native.Cli.runtimeconfig.json', 'Yumlog.Native.Cli.pdb')) {
+        $stubPath = Join-Path $studioRoot $stubName
+        if (Test-Path -LiteralPath $stubPath) { Remove-Item -LiteralPath $stubPath -Force }
+    }
+}
+# `yumlog` on the user PATH forwards to the real CLI (older packages do not ship the shim).
+$shimPath = Join-Path $versionRoot 'Yumlog.Native.Cli\yumlog.cmd'
+if ((Test-Path -LiteralPath (Join-Path $versionRoot 'Yumlog.Native.Cli\Yumlog.Native.Cli.exe')) -and -not (Test-Path -LiteralPath $shimPath)) {
+    Set-Content -LiteralPath $shimPath -Value "@echo off`r`n`"%~dp0Yumlog.Native.Cli.exe`" %*`r`n" -Encoding ascii -NoNewline
+}
 Set-Content -LiteralPath (Join-Path $Destination 'current.txt') -Value $versionRoot -Encoding UTF8
 # Upgrade in place: one installed version only. Remove other version folders
 # and their user PATH entries once the new version is in place.

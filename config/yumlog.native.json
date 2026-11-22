@@ -37,5 +37,24 @@
     "changeThreshold": 0.05,
     "ocrMode": "auto",
     "stopOnIdleSec": 0
+  },
+  "update": {
+    "enabled": true,
+    "repo": "darbotlabs/Yumlog",
+    "apiBase": "https://api.github.com",
+    "webBase": "https://github.com",
+    "timeoutMs": 4000
+  },
+  "specs": {
+    "settingsUri": "ms-settings:about",
+    "windowTitle": "Settings",
+    "windowClass": "ApplicationFrameWindow",
+    "waitMs": 20000,
+    "settleMs": 2500,
+    "maximize": true,
+    "captureMethod": "auto",
+    "libraryFolder": "SystemSpecs",
+    "fileStem": "system-specs",
+    "closeAfter": false
   }
 }

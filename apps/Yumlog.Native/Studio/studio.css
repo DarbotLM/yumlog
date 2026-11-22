@@ -276,3 +276,8 @@ main {
 .voice-appearances .button, .voice-pager .button { min-height: 30px; padding: 4px 6px; font-size: 11px; }
 .voice-slice-controls { display: grid; gap: 6px; }
 .voice-error { color: var(--negative); overflow-wrap: anywhere; font-size: 12px; }
+
+.update-notice { display: flex; align-items: center; gap: 10px; padding: 6px 14px; font-size: 12px;
+  background: color-mix(in srgb, var(--accent, #4f8cff) 18%, transparent); border-bottom: 1px solid var(--line, #2a2f38); }
+.update-notice[hidden] { display: none; }
+.update-notice span { flex: 1; min-width: 0; }

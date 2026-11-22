@@ -7,7 +7,7 @@ const tabIcons = { video: "\uE714", screenshot: "\uE722", audio: "\uE767", trans
   agents: "\uE716", voices: "\uE720", insights: "\uE9D9", harvest: "\uE7B8", settings: "\uE713", library: "\uE8F1" };
 const outputLabels = { clip: "Clip", screenshot: "Screenshot", frame: "Frame", audio: "Audio", spectrogram: "Spectrogram",
   transcript: "Transcript", voice: "Narration", ocr: "Frame analysis", runbook: "MDKG runbook", timedMetadata: "Timed metadata", atomicLibrary: "Atomic library", semanticReport: "Semantic report", bitdot: "Bitdot layers", document: "Source document", schema: "Atomic card schema", agentCard: "AgentCard 3.1",
-  agentVoice: "Speaker excerpts", agentVoices: "Agent Voices timeline" };
+  agentVoice: "Speaker excerpts", agentVoices: "Agent Voices timeline", systemSpecs: "System specs tags" };
 const backLabels = { video: "Video inputs and clips", screenshot: "Screenshot inputs and frames",
   audio: "Audio outputs", transcript: "Transcript sources", agents: "Agent capabilities", voices: "Agent Voices and narration",
   insights: "Analysis outputs", harvest: "Harvest and delivery", settings: "Workspace settings", library: "Atomic widget schemas" };
@@ -15,7 +15,8 @@ const busyLabels = { import: "Opening recordings…", record: "Recording the des
   scenes: "Finding scene changes…", transcribe: "Transcribing audio locally…", bundle: "Building Paperboy bundle…",
   loadOcr: "Loading the Windows AI OCR model…", spectrogram: "Generating spectrogram…", decimate: "Processing the full recording: transcript, visual changes and semantic layers…", importAnalysis: "Verifying and importing analysis…", library: "Loading atomic library…", attachDocument: "Distilling document fields…",
   detectAgentVoices: "Detecting speaker turns and exporting voice previews…", agentVoices: "Loading Agent Voices…",
-  genAudioSpeak: "Rendering narration with gen-audio…", genAudioTranscribe: "Transcribing with gen-audio VibeVoice…" };
+  genAudioSpeak: "Rendering narration with gen-audio…", genAudioTranscribe: "Transcribing with gen-audio VibeVoice…",
+  systemSpecs: "Opening Settings > System > About and tagging the system specs…" };
 
 let state = { videos: [], selectedId: "", tabs: [], artifacts: [], settings: { cardSize: "studio" }, paperboy: null };
 let active = "video";
@@ -154,8 +155,25 @@ async function run(command, payload = {}) {
   }
 }
 
+function showUpdateNotice(notice) {
+  // Non-blocking: only a newer release shows a banner; every other result stays in the log.
+  if (!notice || notice.status !== "update-available") return;
+  const bar = $("update-notice");
+  bar.replaceChildren(
+    element("span", "", `Yumlog ${notice.latest} is available (running ${notice.current}).`),
+    button("View release", () => send("openRelease", {}).then(reply => reply.error && status(reply.error, true))),
+    button("Dismiss", () => { bar.hidden = true; }));
+  bar.hidden = false;
+}
+
 bridge?.addEventListener("message", event => {
   const reply = event.data;
+  if (reply.updateNotice) { showUpdateNotice(reply.updateNotice); return; }
+  if (typeof reply.requestId === "string" && reply.requestId.startsWith("startup-")) {
+    if (reply.state) { state = reply.state; render(); }
+    status(reply.message || "Ready");
+    return;
+  }
   responses.get(reply.requestId)?.(reply);
   responses.delete(reply.requestId);
 });
@@ -929,7 +947,8 @@ function renderPane() {
       const timestamp = numberField("Timestamp (s)", "timestamp", playback(), 0, item?.media?.duration || 604800);
       const threshold = numberField("Sensitivity threshold", "threshold", "0.04", 0.01, 0.95);
       const limit = numberField("Maximum frames", "limit", "100", 1, 300, "1");
-      actions.push(label("Screenshot tools"), stack(act("Capture desktop screenshot", "capture", {}, { primary: !hasSource })));
+      actions.push(label("Screenshot tools"), stack(act("Capture desktop screenshot", "capture", {}, { primary: !hasSource }),
+        act("Capture system specs", "systemSpecs")));
       if (hasSource) {
         actions.push(section("Video frame"), timestamp.wrapper, stack(usePlayhead(timestamp.input),
           act("Save frame", "frame", () => ({ timestamp: timestamp.value() }), { primary: true })),

@@ -139,6 +139,27 @@ function Invoke-Uprev {
     Write-Log "   version is now $new"
 }
 
+# Rust's MSVC linker needs the VC tools LIB/INCLUDE paths. A shell that is not a VS developer prompt (a
+# detached job, a scheduled task) has none, and link.exe then fails with LNK1104 'msvcrt.lib'. Import the
+# environment from the newest VS install that has the x64 VC tools; YUMLOG_VCVARS overrides the batch file.
+function Import-MsvcEnvironment {
+    if ($env:LIB -and $env:INCLUDE) { return }
+    $vcvars = $env:YUMLOG_VCVARS
+    if (-not $vcvars) {
+        $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+        if (-not (Test-Path -LiteralPath $vswhere)) { Write-Log '   vswhere not found; leaving the MSVC environment as is'; return }
+        $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        if (-not $vs) { Write-Log '   no Visual Studio install with x64 VC tools; leaving the MSVC environment as is'; return }
+        $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+    }
+    if (-not (Test-Path -LiteralPath $vcvars)) { throw "MSVC environment script not found: $vcvars" }
+    Write-Log "   importing MSVC environment from $vcvars"
+    foreach ($line in (cmd /d /c "`"$vcvars`" >nul 2>&1 && set")) {
+        if ($line -match '^([^=]+)=(.*)$') { [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process') }
+    }
+    if (-not $env:LIB) { throw "MSVC environment from $vcvars did not set LIB." }
+}
+
 function Invoke-Gate {
     Push-Location $repo
     try {
@@ -163,6 +184,12 @@ function Invoke-Gate {
         }
         Invoke-Checked 'Agent client protocol' { .\launchers\Test-YumlogAgentProtocol.ps1 -DotnetPath dotnet }
         Invoke-Checked 'gen-audio boundary' { .\launchers\Test-YumlogGenAudio.ps1 }
+        Invoke-Checked 'System specs and update check' {
+            $specs = Join-Path $repo 'dist\SystemSpecs-toolbox'
+            Remove-Item -LiteralPath $specs -Recurse -Force -ErrorAction SilentlyContinue
+            try { .\launchers\Test-YumlogSystemSpecs.ps1 -OutputRoot $specs -Capture:(-not $SkipStudioUi) }
+            finally { Remove-Item -LiteralPath $specs -Recurse -Force -ErrorAction SilentlyContinue }
+        }
         Invoke-Checked 'Media presets' { dotnet fsi .\launchers\test-media-presets.fsx }
         Invoke-Checked 'Studio smoke' {
             $smoke = Join-Path $repo 'dist\StudioSmoke-toolbox'
@@ -171,6 +198,7 @@ function Invoke-Gate {
             finally { Remove-Item -LiteralPath $smoke -Recurse -Force -ErrorAction SilentlyContinue }
         }
         if (-not $SkipCargo) {
+            Import-MsvcEnvironment
             Invoke-Checked 'NPU emulator npm dependencies' { npm ci --prefix apps/Yumlog.NpuEmulator --ignore-scripts --no-audit --no-fund }
             Invoke-Checked 'NPU emulator cargo check' {
                 cargo check --locked --manifest-path apps/Yumlog.NpuEmulator/src-tauri/Cargo.toml
@@ -193,6 +221,7 @@ function Invoke-CleanBuild {
     Push-Location $repo
     try {
         Write-Log "== Clean production build $current"
+        Import-MsvcEnvironment
         Get-ChildItem -LiteralPath (Join-Path $repo 'apps') -Directory | ForEach-Object {
             foreach ($child in 'bin', 'obj') { Remove-Item -LiteralPath (Join-Path $_.FullName $child) -Recurse -Force -ErrorAction SilentlyContinue }
         }

@@ -4,9 +4,9 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <Version>0.6.0</Version>
-    <AssemblyVersion>0.6.0.0</AssemblyVersion>
-    <FileVersion>0.6.0.0</FileVersion>
+    <Version>0.7.0</Version>
+    <AssemblyVersion>0.7.0.0</AssemblyVersion>
+    <FileVersion>0.7.0.0</FileVersion>
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSdkBootstrapInitialize>false</WindowsAppSdkBootstrapInitialize>
     <WindowsAppSdkUndockedRegFreeWinRTInitialize>false</WindowsAppSdkUndockedRegFreeWinRTInitialize>
@@ -76,6 +76,25 @@
     <ItemGroup>
       <Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
     </ItemGroup>
+  </Target>
+
+  <!-- The CLI ProjectReference only orders the build. The SDK still copies the CLI's apphost, deps.json and
+       runtimeconfig.json (never its dll) next to Yumlog.Native.exe, and that stub Yumlog.Native.Cli.exe fails with
+       "The application to execute does not exist: ...\Yumlog.Native\Yumlog.Native.Cli.dll". The real CLI ships in
+       its own Yumlog.Native.Cli folder, so keep the stub out of the build and publish outputs. -->
+  <ItemGroup>
+    <YumlogCliStubName Include="Yumlog.Native.Cli.exe;Yumlog.Native.Cli.deps.json;Yumlog.Native.Cli.runtimeconfig.json;Yumlog.Native.Cli.pdb" />
+  </ItemGroup>
+  <Target Name="RemoveCliStubFromBuildOutput" AfterTargets="CopyFilesToOutputDirectory" Condition="'$(DesignTimeBuild)' != 'true' and !Exists('$(TargetDir)Yumlog.Native.Cli.dll')">
+    <Delete Files="@(YumlogCliStubName->'$(TargetDir)%(Identity)')" />
+  </Target>
+  <Target Name="RemoveCliStubFromPublish" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="$([System.String]::Copy('%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)').StartsWith('Yumlog.Native.Cli.'))" />
+    </ItemGroup>
+  </Target>
+  <Target Name="RemoveCliStubFromPublishDir" AfterTargets="Publish" Condition="!Exists('$(PublishDir)Yumlog.Native.Cli.dll')">
+    <Delete Files="@(YumlogCliStubName->'$(PublishDir)%(Identity)')" />
   </Target>
 
   <Target Name="VerifyNativeDesktopOutputs" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true'">

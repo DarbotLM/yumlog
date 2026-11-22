@@ -538,6 +538,11 @@ type NativeCommand =
     | Speak of Map<string, string>
     /// gen-audio VibeVoice transcription (options from the command line).
     | Transcribe of Map<string, string>
+    /// Latest-release check against update.repo (options from the command line).
+    | ShowVersion
+    | UpdateCheckRun of Map<string, string>
+    /// Settings > System > About capture plus WMI spec tags (options from the command line).
+    | Specs of Map<string, string>
     | ListModels
     | Help
 

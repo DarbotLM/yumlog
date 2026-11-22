@@ -39,7 +39,7 @@ dotnet $native extensions mcp --no-external
 
 ### Package identity and OCR
 
-`Package.appxmanifest` declares `DarbotLabs.Yumlog.Native` version `0.6.0.0`, x64,
+`Package.appxmanifest` declares `DarbotLabs.Yumlog.Native` version `0.7.0.0`, x64,
 `packagedClassicApp` / `mediumIL`, `runFullTrust`, `systemAIModels`, and the `Yumlog.Native.exe`
 execution alias. Its OS declarations are `MinVersion=10.0.22621.0` and
 `MaxVersionTested=10.0.26226.0`; those declarations alone do not guarantee AI availability.
