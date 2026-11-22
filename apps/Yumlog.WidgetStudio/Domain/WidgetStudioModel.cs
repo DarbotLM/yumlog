@@ -44,6 +44,29 @@ public static class WidgetStudioSchema
     }
 }
 
+public static class WidgetStudioBuild
+{
+    /// <summary>
+    /// Default package version for new projects: the Widget Studio build's own version (the &lt;Version&gt; that
+    /// toolbox.ps1 -Step Uprev keeps in sync), without the +commit suffix. Falls back to the assembly version.
+    /// </summary>
+    public static string ProductVersion { get; } = ReadProductVersion();
+
+    private static string ReadProductVersion()
+    {
+        var assembly = typeof(WidgetStudioBuild).Assembly;
+        var informational = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(assembly)?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(informational))
+        {
+            var plus = informational.IndexOf('+');
+            return plus > 0 ? informational[..plus] : informational;
+        }
+
+        var version = assembly.GetName().Version;
+        return version is null ? "0.0.0" : $"{version.Major}.{version.Minor}.{Math.Max(version.Build, 0)}";
+    }
+}
+
 public static class WidgetStudioJson
 {
     public static readonly JsonSerializerOptions Options = new()
@@ -61,7 +84,7 @@ public sealed record WidgetStudioProject
     public string SchemaVersion { get; init; } = WidgetStudioSchema.Version;
     public string ProjectId { get; init; } = "";
     public string Name { get; init; } = "";
-    public string Version { get; init; } = "0.5.0";
+    public string Version { get; init; } = WidgetStudioBuild.ProductVersion;
     public string Owner { get; init; } = "";
     public WidgetDefinition Widget { get; init; } = new();
     public WidgetPackageDefinition Package { get; init; } = new();

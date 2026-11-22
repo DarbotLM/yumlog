@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    Shared target framework for the managed Yumlog apps (Paperboy, Paperboy.Mcp, APIM service, WidgetStudio).
+    Picks the newest .NET the active SDK can target: net11.0 on SDK 11, net10.0 on SDK 10.0.4xx, so the apps
+    build on both SDKs without a global.json pin. Import it inside the project body (after Sdk.props has set
+    BundledNETCoreAppTargetFrameworkVersion) and use $(YumlogDotnetTfm) in TargetFramework.
+    Override with -p:YumlogDotnetTfm=net10.0 (or set it as an environment variable) to force one framework.
+  -->
+  <PropertyGroup>
+    <YumlogDotnetTfm Condition="'$(YumlogDotnetTfm)' == '' and '$(BundledNETCoreAppTargetFrameworkVersion)' != '' and $([MSBuild]::VersionGreaterThanOrEquals('$(BundledNETCoreAppTargetFrameworkVersion)', '11.0'))">net11.0</YumlogDotnetTfm>
+    <YumlogDotnetTfm Condition="'$(YumlogDotnetTfm)' == ''">net10.0</YumlogDotnetTfm>
+    <!-- Microsoft.Extensions.* package line that matches the framework (GA releases only, no previews). -->
+    <YumlogExtensionsVersion Condition="'$(YumlogExtensionsVersion)' == '' and '$(YumlogDotnetTfm)' == 'net11.0'">11.0.0</YumlogExtensionsVersion>
+    <YumlogExtensionsVersion Condition="'$(YumlogExtensionsVersion)' == ''">10.0.15</YumlogExtensionsVersion>
+  </PropertyGroup>
+</Project>

@@ -21,7 +21,7 @@ if ($ExistingBundle) {
 }
 if (-not $FfmpegPath) { $FfmpegPath = Join-Path $repo '.tools\ffmpeg\bin\ffmpeg.exe' }
 $ffmpeg = (Resolve-Path -LiteralPath $FfmpegPath).Path
-$bin = Join-Path $repo "apps\Yumlog.Native\bin\$Configuration\net10.0-windows10.0.26100.0\win-x64"
+$bin = & (Join-Path $PSScriptRoot 'Get-YumlogBuildOutput.ps1') -Project Yumlog.Native -Configuration $Configuration
 $dll = Join-Path $bin 'Yumlog.Native.dll'
 if (-not (Test-Path -LiteralPath $dll -PathType Leaf)) { throw "Build Yumlog.Native ($Configuration) before running this test." }
 $desktop = Get-ChildItem 'C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App' -Directory |

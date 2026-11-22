@@ -21,7 +21,7 @@ if ([string]::IsNullOrWhiteSpace($ApiKey)) {
     throw 'ApiKey must not be empty.'
 }
 $projectDirectory = Split-Path -Parent (Resolve-Path -LiteralPath $ProjectPath).Path
-$assemblyPath = Join-Path $projectDirectory 'bin\Release\net11.0-windows\Yumlog.APIM.Service.dll'
+$assemblyPath = Join-Path (& (Join-Path $PSScriptRoot 'Get-YumlogBuildOutput.ps1') -Project (Resolve-Path -LiteralPath $ProjectPath).Path -Configuration Release) 'Yumlog.APIM.Service.dll'
 if (-not (Test-Path -LiteralPath $assemblyPath)) {
     throw "Build the APIM project in Release before running this test: $ProjectPath"
 }

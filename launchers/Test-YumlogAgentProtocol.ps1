@@ -20,7 +20,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Paperboy.Mcp build failed with exit code $LASTEXITCODE."
 }
 
-$dll = Join-Path $repoRoot 'apps\Paperboy.Mcp\bin\Release\net11.0-windows\Paperboy.Mcp.dll'
+$dll = Join-Path (& (Join-Path $PSScriptRoot 'Get-YumlogBuildOutput.ps1') -Project Paperboy.Mcp -Configuration Release -DotnetPath $DotnetPath) 'Paperboy.Mcp.dll'
 $allowedRoot = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Yumlog Native'
 $allowedRoots = @($allowedRoot)
 if ($TagPath) {

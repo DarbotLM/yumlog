@@ -14,9 +14,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$cliRoot = Join-Path $repo "apps\Yumlog.Native.Cli\bin\$Configuration\net10.0-windows10.0.26100.0\win-x64"
+$cliRoot = & (Join-Path $PSScriptRoot 'Get-YumlogBuildOutput.ps1') -Project Yumlog.Native.Cli -Configuration $Configuration
 $cli = Join-Path $cliRoot 'Yumlog.Native.Cli.exe'
-$bin = Join-Path $repo "apps\Yumlog.Native\bin\$Configuration\net10.0-windows10.0.26100.0\win-x64"
+$bin = & (Join-Path $PSScriptRoot 'Get-YumlogBuildOutput.ps1') -Project Yumlog.Native -Configuration $Configuration
 foreach ($required in $cli, (Join-Path $bin 'Yumlog.Native.dll')) { if (-not (Test-Path -LiteralPath $required)) { throw "Build Yumlog.Native and Yumlog.Native.Cli ($Configuration) first; missing $required." } }
 if (-not $Python) { $Python = @(Get-Command python, py -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)[0] }
 if (-not $Python) { throw 'Python 3 is required for the gen-audio boundary stub.' }

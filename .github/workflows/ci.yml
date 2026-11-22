@@ -32,14 +32,14 @@ jobs:
       - name: Build native desktop app
         run: |
           dotnet build .\apps\Yumlog.Native\Yumlog.Native.fsproj -c Release
-          $native = ".\apps\Yumlog.Native\bin\Release\net10.0-windows10.0.26100.0\win-x64"
+          $native = .\launchers\Get-YumlogBuildOutput.ps1 -Project Yumlog.Native -Configuration Release
           if (-not (Test-Path "$native\Yumlog.Native.dll") -or -not (Test-Path "$native\Yumlog.Native.exe")) { throw "Native desktop build outputs are incomplete." }
       - name: Build native CLI
         run: dotnet build .\apps\Yumlog.Native.Cli\Yumlog.Native.Cli.fsproj -c Release
       - name: Run native self-test
         shell: pwsh
         run: |
-          $exe = ".\apps\Yumlog.Native.Cli\bin\Release\net10.0-windows10.0.26100.0\win-x64\Yumlog.Native.Cli.exe"
+          $exe = Join-Path (.\launchers\Get-YumlogBuildOutput.ps1 -Project Yumlog.Native.Cli -Configuration Release) 'Yumlog.Native.Cli.exe'
           & $exe selftest
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Bundle and extension contracts

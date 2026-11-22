@@ -12,7 +12,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $tools = Join-Path $repo 'tools\review'
-if (-not $CliRoot) { $CliRoot = Join-Path $repo "apps\Yumlog.Native.Cli\bin\$Configuration\net10.0-windows10.0.26100.0\win-x64" }
+if (-not $CliRoot) { $CliRoot = & (Join-Path $PSScriptRoot 'Get-YumlogBuildOutput.ps1') -Project Yumlog.Native.Cli -Configuration $Configuration }
 if (-not (Test-Path -LiteralPath (Join-Path $CliRoot 'Yumlog.Native.Cli.dll'))) { throw "Build Yumlog.Native.Cli ($Configuration) first; not found under $CliRoot." }
 if (-not $Python) { $Python = @(Get-Command python, py -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)[0] }
 if (-not $Python) { throw 'Python 3 is required for tools\review\make_runbooks.py.' }
