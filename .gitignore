@@ -32,6 +32,8 @@ ffmpeg_error.log
 ffmpeg_output.log
 .tools/ffmpeg/bin/ffmpeg-*-essentials_build/
 .tools/ffmpeg/bin/*.zip
+# ffmpeg.exe and ffprobe.exe are auto-installed by launchers; never commit binaries
+.tools/ffmpeg/bin/*.exe
 
 # snap binary output (build from snap/ source with: dotnet publish)
 .tools/snap/
