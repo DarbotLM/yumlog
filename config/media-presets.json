@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "catalogId": "darbot-media-presets",
   "durationPresets": [
     {
@@ -189,15 +189,659 @@
       "channels": 2
     }
   ],
+  "audioProfiles": [
+    {
+      "id": "narration",
+      "label": "Narration for video",
+      "use": "narration",
+      "integratedLufs": -16,
+      "truePeakDbtp": -2,
+      "loudnessRangeLu": 11,
+      "delivery": "video-48k-stereo",
+      "codec": "aac",
+      "bitrateKbps": 192,
+      "container": "mp4",
+      "agent": "darbotlabs"
+    },
+    {
+      "id": "narration-master",
+      "label": "Narration master (lossless)",
+      "use": "narration",
+      "integratedLufs": -16,
+      "truePeakDbtp": -2,
+      "loudnessRangeLu": 11,
+      "delivery": "video-48k-stereo",
+      "codec": "pcm_s16le",
+      "container": "wav",
+      "agent": "darbotlabs"
+    },
+    {
+      "id": "podcast",
+      "label": "Podcast episode",
+      "use": "podcast",
+      "integratedLufs": -16,
+      "truePeakDbtp": -1,
+      "loudnessRangeLu": 9,
+      "delivery": "music-44k-stereo",
+      "codec": "libmp3lame",
+      "bitrateKbps": 128,
+      "container": "mp3",
+      "agent": "darbotlm"
+    },
+    {
+      "id": "voice-memo",
+      "label": "Voice memo",
+      "use": "voice-memo",
+      "integratedLufs": -19,
+      "truePeakDbtp": -1.5,
+      "loudnessRangeLu": 11,
+      "delivery": "speech-24k-mono",
+      "codec": "libopus",
+      "bitrateKbps": 32,
+      "container": "opus",
+      "agent": "darbot_devbox1"
+    },
+    {
+      "id": "music-bed",
+      "label": "Music bed under narration",
+      "use": "music-bed",
+      "integratedLufs": -26,
+      "truePeakDbtp": -3,
+      "loudnessRangeLu": 8,
+      "delivery": "video-48k-stereo",
+      "codec": "pcm_s16le",
+      "container": "wav"
+    }
+  ],
+  "videoProfiles": [
+    {
+      "id": "hevc-master",
+      "label": "HEVC master",
+      "codec": "hevc",
+      "encoder": "libx265",
+      "crf": 20,
+      "preset": "medium",
+      "pixelFormat": "yuv420p",
+      "maxBitrateKbps": 16000,
+      "bufferKbps": 32000,
+      "tag": "hvc1"
+    },
+    {
+      "id": "hevc-web",
+      "label": "HEVC web delivery",
+      "codec": "hevc",
+      "encoder": "libx265",
+      "crf": 24,
+      "preset": "medium",
+      "pixelFormat": "yuv420p",
+      "maxBitrateKbps": 8000,
+      "bufferKbps": 16000,
+      "tag": "hvc1"
+    },
+    {
+      "id": "h264-compat",
+      "label": "H.264 compatibility",
+      "codec": "h264",
+      "encoder": "libx264",
+      "crf": 20,
+      "preset": "fast",
+      "pixelFormat": "yuv420p",
+      "maxBitrateKbps": 12000,
+      "bufferKbps": 24000,
+      "profile": "high"
+    },
+    {
+      "id": "h264-social",
+      "label": "H.264 social upload",
+      "codec": "h264",
+      "encoder": "libx264",
+      "crf": 23,
+      "preset": "fast",
+      "pixelFormat": "yuv420p",
+      "maxBitrateKbps": 6000,
+      "bufferKbps": 12000,
+      "profile": "high"
+    }
+  ],
+  "captionStyles": [
+    {
+      "id": "clean-bottom",
+      "label": "Clean bottom captions",
+      "fontFamily": "Arial",
+      "fontSizePx": 48,
+      "primaryColor": "#FFFFFF",
+      "outlineColor": "#000000",
+      "outlinePx": 3,
+      "box": false,
+      "position": "bottom",
+      "marginVerticalPx": 60,
+      "maxCharsPerLine": 42,
+      "maxLines": 2
+    },
+    {
+      "id": "accessible-boxed",
+      "label": "Accessible boxed captions",
+      "fontFamily": "Arial",
+      "fontSizePx": 52,
+      "primaryColor": "#FFFFFF",
+      "outlineColor": "#000000",
+      "outlinePx": 2,
+      "box": true,
+      "position": "bottom",
+      "marginVerticalPx": 72,
+      "maxCharsPerLine": 37,
+      "maxLines": 2
+    },
+    {
+      "id": "social-bold",
+      "label": "Social bold captions",
+      "fontFamily": "Arial",
+      "fontSizePx": 64,
+      "primaryColor": "#FFFFFF",
+      "outlineColor": "#000000",
+      "outlinePx": 4,
+      "box": false,
+      "position": "bottom",
+      "marginVerticalPx": 220,
+      "maxCharsPerLine": 32,
+      "maxLines": 2
+    }
+  ],
+  "pipelinePresets": [
+    {
+      "id": "narrated-explainer",
+      "label": "Narrated explainer video",
+      "defaultDuration": "3m",
+      "stages": [
+        {
+          "stage": "script",
+          "wordsPerMinute": {
+            "minimum": 108,
+            "maximum": 150
+          }
+        },
+        {
+          "stage": "voice",
+          "agents": [
+            "darbotlabs"
+          ],
+          "audioProfile": "narration"
+        },
+        {
+          "stage": "render",
+          "resolution": "1080p",
+          "frameRate": "30"
+        },
+        {
+          "stage": "mix",
+          "audioProfile": "narration",
+          "musicBed": "music-bed"
+        },
+        {
+          "stage": "encode",
+          "videoProfile": "hevc-master",
+          "audioProfile": "narration",
+          "captionStyle": "clean-bottom"
+        },
+        {
+          "stage": "review",
+          "workflow": "standard-narration"
+        }
+      ]
+    },
+    {
+      "id": "compat-explainer",
+      "label": "Explainer for H.264-only players",
+      "defaultDuration": "3m",
+      "stages": [
+        {
+          "stage": "script",
+          "wordsPerMinute": {
+            "minimum": 108,
+            "maximum": 150
+          }
+        },
+        {
+          "stage": "voice",
+          "agents": [
+            "darbotlabs"
+          ],
+          "audioProfile": "narration"
+        },
+        {
+          "stage": "render",
+          "resolution": "1080p",
+          "frameRate": "30"
+        },
+        {
+          "stage": "mix",
+          "audioProfile": "narration",
+          "musicBed": "music-bed"
+        },
+        {
+          "stage": "encode",
+          "videoProfile": "h264-compat",
+          "audioProfile": "narration",
+          "captionStyle": "accessible-boxed"
+        },
+        {
+          "stage": "review",
+          "workflow": "standard-narration"
+        }
+      ]
+    },
+    {
+      "id": "social-short",
+      "label": "Portrait social short",
+      "defaultDuration": "30s",
+      "stages": [
+        {
+          "stage": "script",
+          "wordsPerMinute": {
+            "minimum": 120,
+            "maximum": 165
+          }
+        },
+        {
+          "stage": "voice",
+          "agents": [
+            "devbox4-poweragent"
+          ],
+          "audioProfile": "narration"
+        },
+        {
+          "stage": "render",
+          "resolution": "portrait-1080p",
+          "frameRate": "30"
+        },
+        {
+          "stage": "mix",
+          "audioProfile": "narration"
+        },
+        {
+          "stage": "encode",
+          "videoProfile": "h264-social",
+          "audioProfile": "narration",
+          "captionStyle": "social-bold"
+        },
+        {
+          "stage": "review",
+          "workflow": "short-form"
+        }
+      ]
+    },
+    {
+      "id": "agent-roundtable",
+      "label": "Multi-agent roundtable video",
+      "defaultDuration": "5m",
+      "stages": [
+        {
+          "stage": "script",
+          "wordsPerMinute": {
+            "minimum": 120,
+            "maximum": 160
+          }
+        },
+        {
+          "stage": "voice",
+          "agents": [
+            "devbox4-poweragent",
+            "darbotlm",
+            "darbot-devbox2"
+          ],
+          "audioProfile": "narration"
+        },
+        {
+          "stage": "render",
+          "resolution": "1080p",
+          "frameRate": "30"
+        },
+        {
+          "stage": "mix",
+          "audioProfile": "narration"
+        },
+        {
+          "stage": "encode",
+          "videoProfile": "hevc-web",
+          "audioProfile": "narration",
+          "captionStyle": "clean-bottom"
+        },
+        {
+          "stage": "review",
+          "workflow": "multi-agent"
+        }
+      ]
+    },
+    {
+      "id": "podcast-episode",
+      "label": "Two-host podcast episode",
+      "defaultDuration": "30m",
+      "stages": [
+        {
+          "stage": "script",
+          "wordsPerMinute": {
+            "minimum": 130,
+            "maximum": 170
+          }
+        },
+        {
+          "stage": "voice",
+          "agents": [
+            "darbotlm",
+            "devbox4-poweragent"
+          ],
+          "audioProfile": "podcast"
+        },
+        {
+          "stage": "mix",
+          "audioProfile": "podcast",
+          "musicBed": "music-bed"
+        },
+        {
+          "stage": "encode",
+          "audioProfile": "podcast"
+        },
+        {
+          "stage": "review",
+          "workflow": "podcast-dialogue"
+        }
+      ]
+    },
+    {
+      "id": "voice-memo",
+      "label": "Single-voice memo",
+      "defaultDuration": "1m",
+      "stages": [
+        {
+          "stage": "script",
+          "wordsPerMinute": {
+            "minimum": 120,
+            "maximum": 160
+          }
+        },
+        {
+          "stage": "voice",
+          "agents": [
+            "darbot_devbox1"
+          ],
+          "audioProfile": "voice-memo"
+        },
+        {
+          "stage": "encode",
+          "audioProfile": "voice-memo"
+        },
+        {
+          "stage": "review",
+          "workflow": "voice-memo"
+        }
+      ]
+    }
+  ],
+  "agentPresets": [
+    {
+      "id": "darbot_devbox1",
+      "displayName": "darbot_devbox1",
+      "genAudioVoiceId": "kokoro_onnx.agent-darbot-devbox1",
+      "engine": "kokoro_onnx",
+      "g2p": "misaki.en-us",
+      "speed": 0.95,
+      "blend": [
+        {
+          "voiceId": "am_michael",
+          "weight": 0.7
+        },
+        {
+          "voiceId": "am_adam",
+          "weight": 0.3
+        }
+      ],
+      "a2sweAgent": "darbot_devbox1"
+    },
+    {
+      "id": "darbot-devbox2",
+      "displayName": "darbot-devbox2",
+      "genAudioVoiceId": "kokoro_onnx.agent-darbot-devbox2",
+      "engine": "kokoro_onnx",
+      "g2p": "misaki.en-us",
+      "speed": 1.05,
+      "blend": [
+        {
+          "voiceId": "af_nicole",
+          "weight": 0.6
+        },
+        {
+          "voiceId": "af_bella",
+          "weight": 0.4
+        }
+      ],
+      "a2sweAgent": "darbot-devbox2"
+    },
+    {
+      "id": "devbox3-agentworkshop-hub",
+      "displayName": "devbox3-agentworkshop-hub",
+      "genAudioVoiceId": "kokoro_onnx.agent-devbox3-agentworkshop-hub",
+      "engine": "kokoro_onnx",
+      "g2p": "misaki.en-us",
+      "speed": 1,
+      "blend": [
+        {
+          "voiceId": "am_eric",
+          "weight": 0.55
+        },
+        {
+          "voiceId": "am_liam",
+          "weight": 0.45
+        }
+      ],
+      "a2sweAgent": "devbox3-agentworkshop-hub"
+    },
+    {
+      "id": "devbox4-poweragent",
+      "displayName": "devbox4-poweragent",
+      "genAudioVoiceId": "kokoro_onnx.agent-devbox4-poweragent",
+      "engine": "kokoro_onnx",
+      "g2p": "misaki.en-us",
+      "speed": 0.9,
+      "blend": [
+        {
+          "voiceId": "am_onyx",
+          "weight": 0.65
+        },
+        {
+          "voiceId": "am_michael",
+          "weight": 0.35
+        }
+      ],
+      "a2sweAgent": "devbox4-poweragent"
+    },
+    {
+      "id": "darbotlm",
+      "displayName": "darbotlm",
+      "genAudioVoiceId": "kokoro_onnx.agent-darbotlm",
+      "engine": "kokoro_onnx",
+      "g2p": "misaki.en-us",
+      "speed": 1.08,
+      "blend": [
+        {
+          "voiceId": "af_heart",
+          "weight": 0.4
+        },
+        {
+          "voiceId": "am_echo",
+          "weight": 0.6
+        }
+      ],
+      "a2sweAgent": "darbotlm"
+    },
+    {
+      "id": "darbotlabs",
+      "displayName": "darbotlabs",
+      "genAudioVoiceId": "kokoro_onnx.agent-darbotlabs",
+      "engine": "kokoro_onnx",
+      "g2p": "misaki.en-us",
+      "speed": 0.97,
+      "blend": [
+        {
+          "voiceId": "af_sky",
+          "weight": 0.75
+        },
+        {
+          "voiceId": "af_kore",
+          "weight": 0.25
+        }
+      ],
+      "a2sweAgent": "darbotlabs"
+    }
+  ],
+  "reviewWorkflows": [
+    {
+      "id": "standard-narration",
+      "label": "Standard narration review",
+      "asrModel": "base.en",
+      "maxWordErrorRate": 0.08,
+      "maxSamplePeakDbfs": -1,
+      "maxClippedSamples": 0,
+      "silence": {
+        "thresholdDb": -50,
+        "minimumSeconds": 0.3,
+        "maxInternalSeconds": 1.5,
+        "maxLeadingSeconds": 1,
+        "maxTrailingSeconds": 2
+      },
+      "loudnessToleranceLu": 1.5,
+      "durationTolerance": 0.1,
+      "voiceDistinctness": {
+        "maxBlendSimilarity": 0.9,
+        "minMedianF0SeparationHz": 20
+      }
+    },
+    {
+      "id": "short-form",
+      "label": "Short-form review",
+      "asrModel": "base.en",
+      "maxWordErrorRate": 0.05,
+      "maxSamplePeakDbfs": -1,
+      "maxClippedSamples": 0,
+      "silence": {
+        "thresholdDb": -50,
+        "minimumSeconds": 0.3,
+        "maxInternalSeconds": 1,
+        "maxLeadingSeconds": 0.5,
+        "maxTrailingSeconds": 1
+      },
+      "loudnessToleranceLu": 1.5,
+      "durationTolerance": 0.05,
+      "voiceDistinctness": {
+        "maxBlendSimilarity": 0.9,
+        "minMedianF0SeparationHz": 20
+      }
+    },
+    {
+      "id": "multi-agent",
+      "label": "Multi-agent voice review",
+      "asrModel": "base.en",
+      "maxWordErrorRate": 0.08,
+      "maxSamplePeakDbfs": -1,
+      "maxClippedSamples": 0,
+      "silence": {
+        "thresholdDb": -50,
+        "minimumSeconds": 0.3,
+        "maxInternalSeconds": 1.5,
+        "maxLeadingSeconds": 1,
+        "maxTrailingSeconds": 2
+      },
+      "loudnessToleranceLu": 1.5,
+      "durationTolerance": 0.1,
+      "voiceDistinctness": {
+        "maxBlendSimilarity": 0.8,
+        "minMedianF0SeparationHz": 25
+      }
+    },
+    {
+      "id": "podcast-dialogue",
+      "label": "Podcast dialogue review",
+      "asrModel": "base.en",
+      "maxWordErrorRate": 0.1,
+      "maxSamplePeakDbfs": -1,
+      "maxClippedSamples": 0,
+      "silence": {
+        "thresholdDb": -50,
+        "minimumSeconds": 0.5,
+        "maxInternalSeconds": 2.5,
+        "maxLeadingSeconds": 2,
+        "maxTrailingSeconds": 3
+      },
+      "loudnessToleranceLu": 1,
+      "durationTolerance": 0.15,
+      "voiceDistinctness": {
+        "maxBlendSimilarity": 0.8,
+        "minMedianF0SeparationHz": 25
+      }
+    },
+    {
+      "id": "voice-memo",
+      "label": "Voice memo review",
+      "asrModel": "tiny.en",
+      "maxWordErrorRate": 0.12,
+      "maxSamplePeakDbfs": -1,
+      "maxClippedSamples": 0,
+      "silence": {
+        "thresholdDb": -45,
+        "minimumSeconds": 0.5,
+        "maxInternalSeconds": 2,
+        "maxLeadingSeconds": 1,
+        "maxTrailingSeconds": 1.5
+      },
+      "loudnessToleranceLu": 2,
+      "durationTolerance": 0.2,
+      "voiceDistinctness": {
+        "maxBlendSimilarity": 0.9,
+        "minMedianF0SeparationHz": 20
+      }
+    },
+    {
+      "id": "release-gate",
+      "label": "Strict release gate",
+      "asrModel": "base.en",
+      "maxWordErrorRate": 0.03,
+      "maxSamplePeakDbfs": -1.5,
+      "maxClippedSamples": 0,
+      "silence": {
+        "thresholdDb": -50,
+        "minimumSeconds": 0.3,
+        "maxInternalSeconds": 1,
+        "maxLeadingSeconds": 0.5,
+        "maxTrailingSeconds": 1
+      },
+      "loudnessToleranceLu": 1,
+      "durationTolerance": 0.05,
+      "voiceDistinctness": {
+        "maxBlendSimilarity": 0.8,
+        "minMedianF0SeparationHz": 25
+      }
+    }
+  ],
   "defaults": {
     "duration": "3m",
     "frameRate": "30",
     "resolution": "1080p",
-    "audio": "video-48k-stereo"
+    "audio": "video-48k-stereo",
+    "audioProfile": "narration",
+    "videoProfile": "hevc-master",
+    "captionStyle": "clean-bottom",
+    "pipeline": "narrated-explainer",
+    "agent": "darbotlabs",
+    "reviewWorkflow": "standard-narration"
   },
   "semantics": {
     "duration": "An authoring or recording target. Always measure actual duration; never silently pad, truncate or accelerate speech.",
     "frameRate": "Exact rational rate. Adapters must reject unsupported rates explicitly.",
-    "resolution": "Output dimensions; fitting must preserve aspect ratio unless an explicit crop is selected."
+    "resolution": "Output dimensions; fitting must preserve aspect ratio unless an explicit crop is selected.",
+    "audioProfile": "Loudness target (integrated LUFS, true-peak ceiling, loudness range) applied with FFmpeg loudnorm, plus the delivery sample format and codec. agent names the default agentPresets voice.",
+    "videoProfile": "Encoder settings for delivery. HEVC/libx265 is the default; H.264/libx264 is supported for compatibility. maxBitrateKbps/bufferKbps cap the CRF encode (VBV).",
+    "captionStyle": "Burned-in caption look at a 1080-pixel reference on the short side of the frame, so landscape and portrait captions render the same pixel size. maxCharsPerLine/maxLines drive caption chunking and are enforced by media-review.",
+    "pipeline": "Ordered stages: script, voice, render, mix, encode, review. Audio-only pipelines omit render and carry no videoProfile.",
+    "agentPresets": "Mirror of the Gen-Audio voices/agents blends that a2swe renders: each a2sweAgent names the voice-profiles.json agent whose profile carries the same blend, speed and engine. Gen-Audio-only persona blends are not listed.",
+    "reviewWorkflow": "Measured acceptance thresholds. media-review transcribes the delivery with faster-whisper (asrModel, local files only) for WER. A check whose metric is not measured is reported as not_measured and fails the workflow; nothing passes by default."
   }
 }
