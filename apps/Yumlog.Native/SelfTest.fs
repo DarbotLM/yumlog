@@ -607,8 +607,20 @@ module NativeSelfTest =
         [| check "specs.collect" passed detail
            check "specs.settings.schema" configOk "specs section read with clamped waits" |]
 
+
+    let private studioContracts () =
+        let orderOk = StudioContract.bitcubeBetweenInsightsAndLibrary ()
+        let bitcubeIndex = (StudioContract.tabKeys |> Array.tryFindIndex (fun key -> key = "bitcube") |> Option.defaultValue -1)
+        let labelOk = bitcubeIndex >= 0 && StudioContract.tabLabels[bitcubeIndex] = "bitcube"
+        let layersOk = StudioContract.bitcubeLayerNames = [| "signal"; "tonality"; "confidence"; "quality" |]
+        let requiredOk =
+            StudioContract.cubeIhdrRequiredFields = [| "source_sha256"; "sample_rate_hz"; "bin_frames"; "time_bins"; "freq_bins"; "duration_ms"; "covers_ms"; "inv_hdr_ppm"; "cube_revision"; "n_points" |]
+        [| check "studio.bitcube-tab-order" (orderOk && labelOk) "bitcube sits between Insights and Library"
+           check "studio.bitcube-layers" layersOk "signal, tonality, confidence and quality layers"
+           check "studio.cube-ihdr-fields" requiredOk "cube_ihdr required identity fields" |]
+
     let run (sampleOut: string) =
-        let cases = Array.concat [ mdkgRoundTrip sampleOut; agentCard31 (); encoderProbe (); childCleanup (); updateCheck (); specsCollect () ]
+        let cases = Array.concat [ mdkgRoundTrip sampleOut; agentCard31 (); encoderProbe (); childCleanup (); updateCheck (); specsCollect (); studioContracts () ]
         let failed = cases |> Array.filter (fun case -> not case.Passed)
 
         { Passed = failed.Length = 0

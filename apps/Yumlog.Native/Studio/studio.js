@@ -4,21 +4,21 @@ const $ = id => document.getElementById(id);
 const bridge = window.chrome?.webview;
 const media = id => "https://yumlog-media.local/" + encodeURIComponent(id);
 const tabIcons = { video: "\uE714", screenshot: "\uE722", audio: "\uE767", transcript: "\uE8A5",
-  agents: "\uE716", voices: "\uE720", insights: "\uE9D9", harvest: "\uE7B8", settings: "\uE713", library: "\uE8F1" };
+  agents: "\uE716", voices: "\uE720", insights: "\uE9D9", bitcube: "\uE9F9", harvest: "\uE7B8", settings: "\uE713", library: "\uE8F1" };
 const outputLabels = { clip: "Clip", screenshot: "Screenshot", frame: "Frame", audio: "Audio", spectrogram: "Spectrogram",
-  transcript: "Transcript", voice: "Narration", ocr: "Frame analysis", runbook: "MDKG runbook", timedMetadata: "Timed metadata", atomicLibrary: "Atomic library", semanticReport: "Semantic report", bitdot: "Bitdot layers", document: "Source document", schema: "Atomic card schema", agentCard: "AgentCard 3.1",
+  transcript: "Transcript", voice: "Narration", ocr: "Frame analysis", runbook: "MDKG runbook", timedMetadata: "Timed metadata", atomicLibrary: "Atomic library", semanticReport: "Semantic report", bitdot: "Bitdot layers", bitcube: "Inverse-HDR cube", bitcubeCube: "Bitcube document", bitcubePng: "Bitcube preview", document: "Source document", schema: "Atomic card schema", agentCard: "AgentCard 3.1",
   agentVoice: "Speaker excerpts", agentVoices: "Agent Voices timeline", systemSpecs: "System specs tags" };
 const backLabels = { video: "Video inputs and clips", screenshot: "Screenshot inputs and frames",
   audio: "Audio outputs", transcript: "Transcript sources", agents: "Agent capabilities", voices: "Agent Voices and narration",
-  insights: "Analysis outputs", harvest: "Harvest and delivery", settings: "Workspace settings", library: "Atomic widget schemas" };
+  insights: "Analysis outputs", bitcube: "Inverse-HDR cube", harvest: "Harvest and delivery", settings: "Workspace settings", library: "Atomic widget schemas" };
 const busyLabels = { import: "Opening recordings…", record: "Recording the desktop…", clip: "Exporting clip…",
   scenes: "Finding scene changes…", transcribe: "Transcribing audio locally…", bundle: "Building Paperboy bundle…",
   loadOcr: "Loading the Windows AI OCR model…", spectrogram: "Generating spectrogram…", decimate: "Processing the full recording: transcript, visual changes and semantic layers…", importAnalysis: "Verifying and importing analysis…", library: "Loading atomic library…", attachDocument: "Distilling document fields…",
   detectAgentVoices: "Detecting speaker turns and exporting voice previews…", agentVoices: "Loading Agent Voices…",
   genAudioSpeak: "Rendering narration with gen-audio…", genAudioTranscribe: "Transcribing with gen-audio VibeVoice…",
-  systemSpecs: "Opening Settings > System > About and tagging the system specs…" };
+  systemSpecs: "Opening Settings > System > About and tagging the system specs…", bitcube: "Building the Inverse-HDR bitcube…" };
 
-let state = { videos: [], selectedId: "", tabs: [], artifacts: [], settings: { cardSize: "studio" }, paperboy: null };
+let state = { videos: [], selectedId: "", selectedProjectId: "", projects: [], workspacePath: "", tabs: [], artifacts: [], settings: { cardSize: "studio" }, paperboy: null };
 let active = "video";
 let flipped = false;
 let request = 0;
@@ -36,6 +36,8 @@ const agentVoiceFlips = new Set();
 const agentVoicePages = new Map();
 let atomicLibrary = null;
 let libraryRevision = 0;
+let bitcubeAsset = null;
+let bitcubeRevision = 0;
 let atomicQuery = "";
 let atomicModality = "all";
 let atomicPage = 0;
@@ -123,6 +125,13 @@ async function run(command, payload = {}) {
     if (command === "library") {
       atomicLibrary = typeof reply.data === "string" ? JSON.parse(reply.data) : reply.data;
       libraryRevision++;
+    }
+    if (command === "bitcube") {
+      bitcubeAsset = typeof reply.data === "string" ? JSON.parse(reply.data) : reply.data;
+      bitcubeRevision++;
+    }
+    if (command === "newProject" || command === "selectProject" || command === "refreshContext") {
+      bitcubeAsset = null;
     }
     if (["decimate", "importAnalysis", "attachDocument"].includes(command)) {
       atomicLibrary = null;
@@ -255,14 +264,54 @@ function empty(title, description, action) {
   return surface;
 }
 
+function projectVideos() {
+  const selected = state.selectedProjectId || "";
+  return selected ? (state.videos || []).filter(item => item.projectId === selected) : (state.videos || []);
+}
+
+function renderProjects() {
+  const projects = state.projects || [];
+  const count = $("project-count");
+  if (count) count.textContent = String(projects.length);
+  const path = $("workspace-copy");
+  if (path) {
+    path.textContent = state.workspacePath || state.settings?.outputDirectory || "Select output folder";
+    path.title = path.textContent;
+  }
+  const list = $("project-list");
+  if (!list) return;
+  list.replaceChildren();
+  if (!projects.length) {
+    list.append(element("p", "library-empty", "New project groups recordings, extracted audio and bitcubes."));
+  }
+  for (const project of projects) {
+    const tile = element("button", "project-item");
+    tile.type = "button";
+    tile.title = project.path;
+    tile.setAttribute("aria-current", String(project.id === (state.selectedProjectId || "")));
+    const avatar = element("span", "project-avatar", (project.name || "?")[0]);
+    const text = element("span");
+    text.append(element("span", "tile-title", project.name),
+      element("small", "tile-meta", (project.recordingCount || 0) + " recordings · " + (project.outputCount || 0) + " outputs"));
+    tile.append(avatar, text);
+    tile.addEventListener("click", async () => {
+      if (pending) return;
+      await run("selectProject", { projectId: project.id === state.selectedProjectId ? "" : project.id });
+    });
+    list.append(tile);
+  }
+}
+
 function renderLibrary() {
+  renderProjects();
   const query = $("search").value.trim().toLocaleLowerCase();
-  const matches = state.videos.filter(item => item.name.toLocaleLowerCase().includes(query));
-  $("library-count").textContent = state.videos.length;
+  const visible = projectVideos();
+  const matches = visible.filter(item => item.name.toLocaleLowerCase().includes(query));
+  $("library-count").textContent = visible.length;
   const list = $("recordings");
   list.replaceChildren();
   if (!matches.length) {
-    list.append(element("p", "library-empty", state.videos.length ? "No matching recordings." : "Open a video or record your desktop to start."));
+    list.append(element("p", "library-empty", visible.length ? "No matching recordings." : (state.selectedProjectId ? "Open a video or record to add it to this project." : "Open a video or record your desktop to start.")));
   }
   for (const item of matches) {
     const tile = element("button", "recording-tile");
@@ -323,6 +372,7 @@ function switchTab(key) {
   active = key;
   renderCard();
   if (changed && key === "library" && !atomicLibrary && outputs("atomicLibrary").length && !pending) run("library");
+  if (changed && key === "bitcube" && outputs("bitcube").length && !pending) run("readArtifact", { artifactId: outputs("bitcube")[0].id });
   if (changed && ["agents", "voices"].includes(key) && !agentVoiceManifest && outputs("agentVoices").length && !pending) {
     run("agentVoices");
   }
@@ -466,6 +516,103 @@ function transcript(raw) {
     cues.append(cue);
   }
   return cues.childElementCount ? cues : element("pre", "code", raw);
+}
+
+
+function currentBitcube() {
+  if (bitcubeAsset) return bitcubeAsset;
+  const artifact = outputs("bitcube")[0];
+  if (!artifact) return null;
+  const preview = previews.get(artifact.id);
+  if (!preview) return null;
+  if (typeof preview === "object") return preview;
+  try { return JSON.parse(preview); } catch { return null; }
+}
+
+function bitcubeSurface(item) {
+  const hasAudio = !!(item?.media?.audioCodec);
+  const asset = currentBitcube();
+  if (!item?.exists) return empty("Inverse-HDR cube", "Open a recording and extract its audio track to build a bitcube.");
+  if (!hasAudio) return empty("No audio track", "This recording has no audio to map into a bitcube.");
+  if (!asset) {
+    return empty("Inverse-HDR cube", "Build the gen-audio library_r3 cube to inspect signal, tonality, confidence and quality layers, plus the cube uid, revision and covered range.",
+      act("Build bitcube", "bitcube", {}, { primary: true }));
+  }
+  const fields = asset.fields || {};
+  const body = asset.body || {};
+  const cube = asset.cube || {};
+  const wrap = element("section", "bitcube-panel");
+  const header = element("div");
+  header.append(element("h3", "", cube.title || "Inverse-HDR cube"));
+  const meta = element("dl", "bitcube-meta");
+  const rows = [
+    ["Cube uid", asset.uid || ""],
+    ["Revision", String(fields.cube_revision ?? cube.cube_revision ?? "")],
+    ["Covered range", (body.cube_covers_s != null ? Number(body.cube_covers_s).toFixed(3) + " s" : "") + (fields.covers_ms != null ? " · " + fields.covers_ms + " ms" : "")],
+    ["Bins", "f×t " + (Array.isArray(body.cube_shape_f_t) ? body.cube_shape_f_t.join(" × ") : "—") + (body.bin_seconds != null ? " · " + Number(body.bin_seconds).toFixed(4) + " s/bin" : "")],
+    ["inv_hdr", body.inv_hdr != null ? String(body.inv_hdr) : ""],
+    ["layer_score", body.layer_score != null ? String(body.layer_score) : ""],
+    ["layer_method", fields.layer_method || (cube.provenance && cube.provenance.layer_method) || "library_r3"]
+  ];
+  for (const [key, value] of rows) {
+    if (!value) continue;
+    const dt = element("dt", "", key);
+    const dd = element("dd", "", value);
+    meta.append(dt, dd);
+  }
+  wrap.append(header, meta);
+  const layerWrap = element("div", "bitcube-layers");
+  const layerStats = cube.layers || {};
+  const layerAssets = Array.isArray(asset.layers) ? asset.layers : [];
+  for (let i = 0; i < 4; i++) {
+    const name = ["signal", "tonality", "confidence", "quality"][i];
+    const stats = layerStats[name] || (layerAssets[i] && layerAssets[i].body) || {};
+    const card = element("article", "bitcube-layer");
+    card.append(element("h3", "", name));
+    card.append(element("p", "", [
+      stats.mean != null ? "mean " + Number(stats.mean).toFixed(3) : "",
+      stats.p90 != null ? "p90 " + Number(stats.p90).toFixed(3) : "",
+      stats.active_frac != null ? "active " + Number(stats.active_frac).toFixed(3) : ""
+    ].filter(Boolean).join(" · ")));
+    layerWrap.append(card);
+  }
+  wrap.append(layerWrap);
+  const canvas = element("canvas", "bitcube-canvas");
+  canvas.width = 720;
+  canvas.height = 280;
+  canvas.setAttribute("aria-label", "Bitcube point preview");
+  wrap.append(canvas);
+  const legend = element("div", "bitcube-legend");
+  const colors = { signal: "#3373f2", tonality: "#26bf66", confidence: "#f28c1a", quality: "#f266bf" };
+  for (const name of Object.keys(colors)) {
+    const itemEl = element("span");
+    const swatch = element("i");
+    swatch.style.background = colors[name];
+    itemEl.append(swatch, document.createTextNode(name));
+    legend.append(itemEl);
+  }
+  wrap.append(legend);
+  requestAnimationFrame(() => drawBitcube(canvas, cube.points_preview || []));
+  return wrap;
+}
+
+function drawBitcube(canvas, points) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const width = canvas.width, height = canvas.height;
+  ctx.fillStyle = "#0b0d11";
+  ctx.fillRect(0, 0, width, height);
+  const pad = 24;
+  for (const point of points) {
+    const x = pad + (Number(point.t) || 0) * (width - pad * 2);
+    const y = height - pad - (Number(point.f) || 0) * (height - pad * 2);
+    const depth = Number(point.z) || 0;
+    const radius = 1.2 + depth * 1.8;
+    ctx.fillStyle = "rgba(" + Math.round((point.r || 0) * 255) + "," + Math.round((point.g || 0) * 255) + "," + Math.round((point.b || 0) * 255) + "," + (point.a != null ? point.a : 0.8) + ")";
+    ctx.beginPath();
+    ctx.arc(x, y + (0.5 - depth) * 18, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function atomicLibrarySurface() {
@@ -762,7 +909,7 @@ function agentVoicesSurface(item) {
 function renderFront(item) {
   const face = $("tool-face");
   const key = [active, item?.id, item?.exists, clipPreview, ...state.artifacts.map(output => output.id),
-    capabilities.length, voices.length, previews.size, libraryRevision, JSON.stringify(item?.media),
+    capabilities.length, voices.length, previews.size, libraryRevision, bitcubeRevision, JSON.stringify(item?.media),
     active === "settings" ? JSON.stringify(state.settings) : "", ["transcript", "insights", "voices"].includes(active) ? selectedOutput : "",
     ["agents", "voices"].includes(active) ? agentVoiceRevision : "", voiceSlice?.voice.id, voiceSlice?.index].join(":");
   // Keep the native media element stable when a command returns the same view.
@@ -837,6 +984,10 @@ function renderFront(item) {
         }
         contents.push(element("h3", "", "Native capability catalog"), catalog);
       }
+      break;
+    }
+    case "bitcube": {
+      contents = [bitcubeSurface(item)];
       break;
     }
     case "library": {
@@ -1012,6 +1163,17 @@ function renderPane() {
       if (current && ["ocr", "runbook", "semanticReport", "bitdot", "atomicLibrary"].includes(current.kind)) actions.push(act("View analysis", "readArtifact", { artifactId: current.id }));
       break;
     }
+    case "bitcube": {
+      const hasAudio = !!(item?.media?.audioCodec);
+      const cube = outputs("bitcube")[0];
+      actions.push(label("Inverse-HDR bitcube"), hint("Port of the gen-audio library_r3 cube: signal, tonality, confidence and quality layers, plus cube uid, revision and covered range."),
+        stack(act("Build / refresh bitcube", "bitcube", {}, { primary: true, enabled: hasAudio && !!item }),
+          act("Extract WAV", "wave", {}, { enabled: hasAudio && !!item })));
+      if (cube) actions.push(section("Cube files"), stack(act("Open cube JSON", "openArtifact", { artifactId: cube.id }), act("Save cube JSON", "exportArtifact", { artifactId: cube.id })));
+      const png = outputs("bitcubePng")[0];
+      if (png) actions.push(act("Open cube preview", "openArtifact", { artifactId: png.id }));
+      break;
+    }
     case "library": {
       const libraryOutput = outputs("atomicLibrary")[0];
       actions.push(label("Atomic schema library"), hint("Video, audio and document cards retain source evidence. Flip a card to inspect its JSON, provenance and unknown attributes."),
@@ -1065,11 +1227,12 @@ function renderCard() {
 
 function render() {
   const item = video();
-  $("workspace-title").textContent = item?.title || "Capture workspace";
+  const selectedProject = (state.projects || []).find(project => project.id === state.selectedProjectId);
+  $("workspace-title").textContent = item?.title || selectedProject?.name || "Capture workspace";
   $("workspace-title").title = $("workspace-title").textContent;
   $("workspace-meta").textContent = item?.media
     ? [item.name, clock(item.media.duration), item.media.width + " × " + item.media.height].join("  ·  ")
-    : item?.name || "Local recording library";
+    : selectedProject ? selectedProject.path : (item?.name || "Local recording library");
   $("workspace-meta").title = $("workspace-meta").textContent;
   renderLibrary();
   renderCard();
@@ -1085,6 +1248,22 @@ $("record").addEventListener("click", () => {
 });
 $("card-size").addEventListener("change", event => run("setSize", { cardSize: event.target.value }));
 $("output-folder").addEventListener("click", () => run("openOutput"));
+$("workspace-card")?.addEventListener("click", () => { setFlip(false); switchTab("settings"); });
+$("refresh-context")?.addEventListener("click", () => run("refreshContext"));
+$("new-project")?.addEventListener("click", () => {
+  const dialog = $("project-dialog");
+  const input = $("project-name");
+  if (input) input.value = "";
+  if (dialog?.showModal) dialog.showModal();
+  input?.focus();
+});
+$("project-form")?.addEventListener("submit", event => {
+  const submitter = event.submitter;
+  if (submitter && submitter.value === "create") {
+    const name = $("project-name")?.value.trim();
+    if (name) void run("newProject", { name });
+  }
+});
 $("flip").addEventListener("click", () => setFlip(!flipped));
 render();
 run("snapshot");

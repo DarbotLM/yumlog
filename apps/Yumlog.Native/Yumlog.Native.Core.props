@@ -38,6 +38,7 @@
     <Compile Include="$(YumlogNativeDir)SystemSpecs.fs" Link="SystemSpecs.fs" />
     <Compile Include="$(YumlogNativeDir)Mdkg.fs" Link="Mdkg.fs" />
     <Compile Include="$(YumlogNativeDir)MdkgIntel.fs" Link="MdkgIntel.fs" />
+    <Compile Include="$(YumlogNativeDir)StudioContract.fs" Link="StudioContract.fs" />
     <Compile Include="$(YumlogNativeDir)SelfTest.fs" Link="SelfTest.fs" />
     <Compile Include="$(YumlogNativeDir)Config.fs" Link="Config.fs" />
     <Compile Include="$(YumlogNativeDir)Capture.fs" Link="Capture.fs" />

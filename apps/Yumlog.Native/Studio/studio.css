@@ -75,7 +75,7 @@ h1, h2, h3, h4, p { margin: 0; }
 .button.primary:hover:not(:disabled) { background: #d0ffa4; }
 .record-dot { background: #ff827f; width: 9px; height: 9px; border-radius: 50%; }
 .library-toggle { display: none; }
-.app-body { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: calc(100vh - 68px); }
+.app-body { display: grid; grid-template-columns: 256px minmax(0, 1fr); min-height: calc(100vh - 68px); }
 .library { min-width: 0; min-height: 0; background: var(--sidebar); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 24px 15px 14px; }
 .library-head { display: flex; align-items: center; justify-content: space-between; padding: 0 5px; margin-bottom: 15px; }
 .library-head h2 { font-size: 15px; font-weight: 680; }
@@ -281,3 +281,34 @@ main {
   background: color-mix(in srgb, var(--accent, #4f8cff) 18%, transparent); border-bottom: 1px solid var(--line, #2a2f38); }
 .update-notice[hidden] { display: none; }
 .update-notice span { flex: 1; min-width: 0; }
+
+.sidebar-section-title { margin: 0 5px 8px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.workspace-card { display: flex; width: 100%; align-items: center; gap: 9px; padding: 10px 9px; text-align: left; border: 1px solid var(--line); border-radius: 9px; background: var(--well); color: var(--text); margin-bottom: 4px; }
+.workspace-card:hover { border-color: var(--accent); }
+.workspace-copy { min-width: 0; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; font-size: 12px; }
+.projects-heading { display: flex; gap: 6px; margin-top: 22px; }
+.project-list { display: grid; gap: 4px; min-height: 0; max-height: 28vh; overflow-y: auto; margin-bottom: 8px; }
+.project-item { display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px; text-align: left; color: var(--muted); border-radius: 8px; border: 0; background: transparent; }
+.project-item:hover, .project-item[aria-current="true"] { color: var(--text); background: #27313a; }
+.project-item[aria-current="true"] { box-shadow: inset 3px 0 var(--accent); }
+.project-avatar { display: grid; place-items: center; width: 25px; height: 25px; color: #1a2a12; border-radius: 7px; background: var(--accent); font-size: 12px; font-weight: 700; }
+.new-project-button { margin: 4px 0 8px; }
+.library-head { margin-top: 18px; }
+.recordings { max-height: max(160px, calc(100vh - 520px)); }
+.project-dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); padding: 22px; width: min(420px, 92vw); }
+.project-dialog h2 { font-size: 18px; margin-bottom: 8px; }
+.project-dialog p { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+.project-dialog label { display: grid; gap: 6px; font-size: 12px; font-weight: 600; }
+.project-dialog input { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--well); color: var(--text); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.bitcube-panel { display: grid; gap: 14px; }
+.bitcube-meta { display: grid; gap: 6px; }
+.bitcube-meta dt { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.bitcube-meta dd { margin: 0; font-family: "Cascadia Mono", "Segoe UI Mono", Consolas, monospace; font-size: 12px; word-break: break-all; }
+.bitcube-layers { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.bitcube-layer { padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--well); }
+.bitcube-layer h3 { font-size: 13px; text-transform: capitalize; }
+.bitcube-layer p { color: var(--muted); font-size: 11px; margin-top: 4px; }
+.bitcube-canvas { width: 100%; height: 280px; border: 1px solid var(--line); border-radius: 8px; background: #0b0d11; }
+.bitcube-legend { display: flex; flex-wrap: wrap; gap: 10px; color: var(--muted); font-size: 12px; }
+.bitcube-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; }

@@ -19,7 +19,13 @@
   </header>
   <div id="update-notice" class="update-notice" role="status" hidden></div>
   <div class="app-body">
-    <aside id="library" class="library" aria-label="Recording library">
+    <aside id="library" class="library" aria-label="Project workspace">
+      <div class="sidebar-section-title">Workspace</div>
+      <button type="button" class="workspace-card" id="workspace-card" title="Workspace settings"><span class="workspace-copy" id="workspace-copy">Select output folder</span></button>
+      <div class="sidebar-section-title projects-heading">Project / Workspace · <span id="project-count">0</span></div>
+      <div id="project-list" class="project-list" aria-label="Projects and workspaces"></div>
+      <button type="button" id="new-project" class="button primary new-project-button">New project</button>
+      <button type="button" id="refresh-context" class="button">Refresh context</button>
       <div class="library-head">
         <h2>Recordings</h2><span id="library-count" class="count"></span>
       </div>
@@ -27,6 +33,17 @@
       <div id="recordings" class="recordings"></div>
       <button type="button" id="output-folder" class="button folder-button">Open output folder <span aria-hidden="true">↗</span></button>
     </aside>
+    <dialog id="project-dialog" class="project-dialog">
+      <form method="dialog" id="project-form">
+        <h2>New project</h2>
+        <p>Create a Studio project that groups recordings, extracted audio and bitcubes.</p>
+        <label>Project name <input id="project-name" name="name" type="text" required maxlength="120" placeholder="Copilot ClaimsAssist for Auto"></label>
+        <div class="dialog-actions">
+          <button type="submit" value="cancel" class="button">Cancel</button>
+          <button type="submit" value="create" class="button primary">Create</button>
+        </div>
+      </form>
+    </dialog>
     <main id="workspace">
       <header class="workspace-header">
         <div class="workspace-heading">

@@ -8,6 +8,8 @@ open System.IO.Compression
 open System.Security.Cryptography
 open System.Text
 open System.Text.Json
+open System.Text.Json.Nodes
+open System.Text.RegularExpressions
 open Paperboy.Desktop.Services
 open Yumlog.Native.Mdkg
 
@@ -37,13 +39,21 @@ module DesktopLibrary =
           AddedAt: DateTimeOffset
           Media: DesktopMedia.MediaInfo option
           Poster: string
-          Artifacts: Artifact array }
+          Artifacts: Artifact array
+          ProjectId: string }
+
+    type Project =
+        { Id: string
+          Name: string
+          Path: string }
 
     type Library =
         { Settings: Settings
           SelectedId: string
           Videos: Video array
-          Captures: Artifact array }
+          Captures: Artifact array
+          Projects: Project array
+          SelectedProjectId: string }
 
     type ToolTab =
         { Key: string
@@ -76,6 +86,9 @@ module DesktopLibrary =
            { Key = "insights"; Label = "Insights"; Role = "recording-and-frame-analysis"
              Inputs = [| "recording"; "frame"; "timedMetadata" |]; Outputs = [| "mediaInfo"; "ocr"; "runbook" |]
              Actions = [| "probe"; "ocr"; "runbook"; "decimate"; "importAnalysis" |] }
+           { Key = "bitcube"; Label = "bitcube"; Role = "inverse-hdr-cube"
+             Inputs = [| "audioTrack" |]; Outputs = [| "bitcube"; "audio" |]
+             Actions = [| "bitcube"; "wave" |] }
            { Key = "library"; Label = "Library"; Role = "atomic-flipcard-schemas"
              Inputs = [| "sourceRecording"; "transcript"; "documents" |]; Outputs = [| "atomicLibrary"; "bitdot"; "schema" |]
              Actions = [| "library"; "decimate"; "attachDocument"; "exportArtifact" |] }
@@ -175,8 +188,13 @@ module DesktopLibrary =
               FfmpegPath = ""; WhisperPath = ""; WhisperModel = ""
               GenAudioPython = ""; GenAudioRoot = ""; GenAudioEngine = ""; GenAudioVoice = ""; VibeVoiceModel = "" }
         let statePath = Path.Combine(root, "studio.json")
-        let defaults = { Settings = settings; SelectedId = ""; Videos = [||]; Captures = [||] }
-        let mutable state = if File.Exists(statePath) then NativeJson.readOver defaults statePath else defaults
+        let defaults = { Settings = settings; SelectedId = ""; Videos = [||]; Captures = [||]; Projects = [||]; SelectedProjectId = "" }
+        let normalize (library: Library) =
+            { library with
+                SelectedProjectId = orEmptyIfNull library.SelectedProjectId
+                Projects = if obj.ReferenceEquals(library.Projects, null) then [||] else library.Projects
+                Videos = library.Videos |> Array.map (fun video -> { video with ProjectId = orEmptyIfNull video.ProjectId }) }
+        let mutable state = normalize (if File.Exists(statePath) then NativeJson.readOver defaults statePath else defaults)
         let mediaPaths = ConcurrentDictionary<string, string>(StringComparer.Ordinal)
         let config () = NativeConfig.load NativeConfig.defaultConfigPath
         let recordConfig () =
@@ -190,40 +208,68 @@ module DesktopLibrary =
                 Engine = state.Settings.GenAudioEngine; Voice = state.Settings.GenAudioVoice
                 VibeVoiceModel = state.Settings.VibeVoiceModel }
 
+        let projectById id = state.Projects |> Array.tryFind (fun project -> project.Id = id)
+        let under (rootPath: string) (file: string) =
+            if String.IsNullOrWhiteSpace(rootPath) || String.IsNullOrWhiteSpace(file) then false
+            else
+                let rootFull = Path.GetFullPath(rootPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                let fileFull = Path.GetFullPath(file)
+                fileFull.Equals(rootFull, StringComparison.OrdinalIgnoreCase)
+                || fileFull.StartsWith(rootFull + string Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                || fileFull.StartsWith(rootFull + string Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+        let inferProject path =
+            state.Projects |> Array.tryFind (fun project -> under project.Path path)
+        let slug (name: string) =
+            let cleaned = Regex.Replace(name.Trim().ToLowerInvariant(), @"[^a-z0-9]+", "-").Trim('-')
+            if cleaned = "" then "project" else cleaned
+        let projectRoot (video: Video) =
+            match projectById video.ProjectId with
+            | Some project -> Directory.CreateDirectory(Path.Combine(project.Path, "outputs")).FullName
+            | None -> state.Settings.OutputDirectory
+        let hasAudio (video: Video) =
+            match video.Media with
+            | Some info -> not (String.IsNullOrWhiteSpace info.AudioCodec)
+            | None -> true
+        let live id = state.Videos |> Array.find (fun video -> video.Id = id)
         let save updated =
             writeAtomic statePath updated
             state <- updated
 
         let selected () = state.Videos |> Array.tryFind (fun video -> video.Id = state.SelectedId)
-        let current () = selected () |> Option.defaultWith (fun () -> invalidOp "Open a recording first.")
+        let current () : Video = selected () |> Option.defaultWith (fun () -> invalidOp "Open a recording first.")
         let source () =
             let video = current ()
             if not (File.Exists(video.Path)) then invalidOp "The source file was moved or is unavailable."
             video
 
-        let update video =
+        let update (video: Video) =
             save { state with Videos = state.Videos |> Array.map (fun original -> if original.Id = video.Id then video else original) }
 
         let newDirectory root =
             let name = DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture) + "-" + Guid.NewGuid().ToString("N")[..7]
             Directory.CreateDirectory(Path.Combine(root, name)).FullName
 
-        let job produce =
-            let directory = newDirectory state.Settings.OutputDirectory
+        let jobAt root produce =
+            let directory = newDirectory root
             try produce directory
             with _ ->
                 try Directory.Delete(directory, true) with _ -> ()
                 reraise ()
 
-        let attach video files =
+        let job produce = jobAt state.Settings.OutputDirectory produce
+
+        let attach (video: Video) files =
             update { video with Artifacts = Array.append files video.Artifacts }
 
-        let createArtifact video kind name create =
-            job (fun directory ->
+        let createArtifactAt root (video: Video) kind name create =
+            jobAt root (fun directory ->
                 let file = Path.Combine(directory, name)
                 create file
                 if not (File.Exists(file)) then invalidOp "The tool did not produce an output file."
                 attach video [| plain kind file |])
+
+        let createArtifact (video: Video) kind name create =
+            createArtifactAt (projectRoot video) video kind name create
 
         let makeVideo path =
             if not (File.Exists(path)) || not (DesktopMedia.videoExtensions.Contains(DesktopMedia.extension path)) then
@@ -246,15 +292,74 @@ module DesktopLibrary =
                         if File.Exists(temporary) then File.Move(temporary, destination)
                     with _ -> File.Delete(temporary)
                 if File.Exists(destination) then destination else ""
-            { Id = id; Path = path; AddedAt = DateTimeOffset.UtcNow; Media = info; Poster = poster; Artifacts = [||] }
+            { Id = id; Path = path; AddedAt = DateTimeOffset.UtcNow; Media = info; Poster = poster; Artifacts = [||]; ProjectId = "" }
+
+        let place (path: string) =
+            match projectById state.SelectedProjectId with
+            | Some project when not (under project.Path path) ->
+                let folder = Directory.CreateDirectory(Path.Combine(project.Path, "recordings")).FullName
+                let destination = Path.Combine(folder, fileName path)
+                let target =
+                    if not (File.Exists(destination)) then destination
+                    elif String.Equals(GenAudio.sha256 destination, GenAudio.sha256 path, StringComparison.OrdinalIgnoreCase) then destination
+                    else
+                        let stem = Path.GetFileNameWithoutExtension(path) |> orEmptyIfNull
+                        let ext = Path.GetExtension(path) |> orEmptyIfNull
+                        Path.Combine(folder, stem + "-" + Guid.NewGuid().ToString("N")[..7] + ext)
+                if not (String.Equals(Path.GetFullPath(path), Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase)) then
+                    File.Copy(path, target, false)
+                target
+            | _ -> path
+
+        let assign (video: Video) =
+            let projectId =
+                match inferProject video.Path with
+                | Some project -> project.Id
+                | None -> orEmptyIfNull state.SelectedProjectId
+            { video with ProjectId = projectId }
+
+        let extractWave (video: Video) =
+            if video.Artifacts |> Array.exists (fun artifact -> artifact.Kind = "audio" && File.Exists(artifact.Path)) then live video.Id
+            else
+                createArtifact video "audio" "audio.wav" (DesktopMedia.wave (ffmpeg ()) video.Path)
+                live video.Id
+
+        let extractCube (video: Video) =
+            if video.Artifacts |> Array.exists (fun artifact -> artifact.Kind = "bitcube" && File.Exists(artifact.Path)) then live video.Id
+            else
+                let wav =
+                    video.Artifacts
+                    |> Array.tryFind (fun artifact -> artifact.Kind = "audio" && File.Exists(artifact.Path))
+                    |> Option.map (fun artifact -> artifact.Path)
+                    |> Option.defaultWith (fun () -> invalidOp "Extract the audio track before building a bitcube.")
+                let directory = newDirectory (projectRoot video)
+                let built = StudioBitCube.build root (genAudio ()) wav directory (title video.Path) (title video.Path)
+                let files =
+                    [| Some(plain "bitcube" built.AssetPath)
+                       if built.CubeJsonPath <> "" && File.Exists(built.CubeJsonPath) then Some(plain "bitcubeCube" built.CubeJsonPath) else None
+                       if built.PngPath <> "" && File.Exists(built.PngPath) then Some(plain "bitcubePng" built.PngPath) else None |]
+                    |> Array.choose id
+                attach (live video.Id) files
+                live video.Id
+
+        let ingestProjectVideo (video: Video) =
+            if String.IsNullOrWhiteSpace video.ProjectId then video
+            elif not (hasAudio video) then video
+            else
+                let withWave = extractWave (live video.Id)
+                try extractCube withWave
+                with _ -> withWave
 
         let import (paths: string array) =
-            let ids = paths |> Array.map key
+            let placed = paths |> Array.map place
+            let ids = placed |> Array.map key
             let previous = state.Videos |> Array.map (fun video -> video.Id) |> Set.ofArray
             let additions =
-                paths |> Array.distinctBy key |> Array.filter (fun path -> not (previous.Contains(key path))) |> Array.map makeVideo
+                placed |> Array.distinctBy key |> Array.filter (fun path -> not (previous.Contains(key path))) |> Array.map (makeVideo >> assign)
             if ids.Length > 0 then
                 save { state with Videos = Array.append additions state.Videos; SelectedId = ids[0] }
+            for video in additions do
+                ingestProjectVideo (live video.Id) |> ignore
             match additions.Length with
             | 0 -> "Recording already in the library."
             | 1 -> "Recording added."
@@ -281,15 +386,23 @@ module DesktopLibrary =
                     register video.Id video.Path
                     register (video.Id + "-poster") video.Poster
                     {| id = video.Id; title = title video.Path; name = fileName video.Path; exists = File.Exists(video.Path)
-                       addedAt = video.AddedAt; media = video.Media; hasPoster = File.Exists(video.Poster) |})
+                       addedAt = video.AddedAt; media = video.Media; hasPoster = File.Exists(video.Poster); projectId = orEmptyIfNull video.ProjectId |})
             let outputs =
                 match active with
                 | Some video -> artifacts video
                 | None -> state.Captures
             for item in outputs do
                 register item.Id item.Path
+            let projects =
+                state.Projects |> Array.map (fun project ->
+                    let members = state.Videos |> Array.filter (fun video -> video.ProjectId = project.Id)
+                    let outputCount = members |> Array.sumBy (fun video -> (artifacts video).Length)
+                    {| id = project.Id; name = project.Name; path = project.Path; recordingCount = members.Length; outputCount = outputCount |})
             {| videos = rows
                selectedId = state.SelectedId
+               selectedProjectId = orEmptyIfNull state.SelectedProjectId
+               workspacePath = state.Settings.OutputDirectory
+               projects = projects
                settings = state.Settings
                tabs = tabs
                artifacts = Array.map descriptor outputs
@@ -321,6 +434,43 @@ module DesktopLibrary =
 
             match command with
             | "snapshot" -> result ""
+            | "selectProject" ->
+                let id = get "projectId"
+                if id <> "" && projectById id = None then invalidOp "Project not found."
+                save { state with SelectedProjectId = id }
+                result ""
+            | "newProject" ->
+                let name = get "name"
+                if String.IsNullOrWhiteSpace(name) then invalidOp "Enter a project name."
+                let id = slug name
+                if state.Projects |> Array.exists (fun project -> project.Id = id) then invalidOp "A project with that name already exists."
+                let path = Path.Combine(state.Settings.OutputDirectory, "projects", id)
+                Directory.CreateDirectory(Path.Combine(path, "recordings")) |> ignore
+                Directory.CreateDirectory(Path.Combine(path, "outputs")) |> ignore
+                let project = { Id = id; Name = name.Trim(); Path = path }
+                save { state with Projects = Array.append state.Projects [| project |]; SelectedProjectId = id }
+                result $"Project '{project.Name}' created."
+            | "refreshContext" ->
+                let discovered =
+                    state.Projects
+                    |> Array.collect (fun project ->
+                        let roots =
+                            [| project.Path
+                               Path.Combine(project.Path, "recordings") |]
+                        roots
+                        |> Array.filter Directory.Exists
+                        |> Array.collect (fun folder -> Directory.GetFiles(folder))
+                        |> Array.filter (fun file -> DesktopMedia.videoExtensions.Contains(DesktopMedia.extension file)))
+                result (import discovered)
+            | "bitcube" ->
+                let video = source ()
+                if not (hasAudio video) then invalidOp "This recording has no audio track."
+                let ready = extractWave video |> extractCube
+                let asset =
+                    ready.Artifacts
+                    |> Array.tryFind (fun artifact -> artifact.Kind = "bitcube" && File.Exists(artifact.Path))
+                    |> Option.defaultWith (fun () -> invalidOp "Bitcube generation did not write an asset.")
+                data $"Bitcube ready." (JsonNode.Parse(File.ReadAllText(asset.Path)))
             | "select" ->
                 let id = get "videoId"
                 if not (state.Videos |> Array.exists (fun video -> video.Id = id)) then invalidOp "Recording not found."
@@ -365,7 +515,11 @@ module DesktopLibrary =
                 result "Settings saved."
             | "record" ->
                 let duration = bounded "duration" 1.0 600.0 payload |> int
-                job (fun directory ->
+                let recordRoot =
+                    match projectById state.SelectedProjectId with
+                    | Some project -> Directory.CreateDirectory(Path.Combine(project.Path, "recordings")).FullName
+                    | None -> state.Settings.OutputDirectory
+                jobAt recordRoot (fun directory ->
                     let config = recordConfig ()
                     let isFfmpeg = config.Backend = "ffmpeg"
                     let format = if isFfmpeg then "mp4" else config.Container

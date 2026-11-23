@@ -223,6 +223,31 @@ try
     pass "harvest.bundle" $"Verified SHA-256 and length of {entries.GetArrayLength()} entries"
     require (hash video=saved) "Input recording changed"
     pass "source.unchanged" "Source SHA-256 unchanged"
+    let snapshotTabs = workspace.Snapshot().tabs |> Array.map (fun tab -> tab.Key)
+    require (snapshotTabs = StudioContract.tabKeys) "Studio tabs must match StudioContract, with bitcube between Insights and Library"
+    pass "studio.tab-order" (String.Join(" > ", snapshotTabs))
+    run "newProject" [("name","Copilot ClaimsAssist for Auto")] [||] |> ignore
+    let created = state()
+    require (created.SelectedProjectId="copilot-claimsassist-for-auto") "ClaimsAssist project was not selected"
+    require (created.Projects |> Array.exists (fun project -> project.Name="Copilot ClaimsAssist for Auto" && Directory.Exists(project.Path))) "ClaimsAssist project folder missing"
+    let projectPath = (created.Projects |> Array.find (fun project -> project.Id="copilot-claimsassist-for-auto")).Path
+    pass "project.create" projectPath
+    run "import" [] [|video|] |> ignore
+    let projectVideo = workspace.Snapshot().videos |> Array.find (fun item -> item.projectId="copilot-claimsassist-for-auto")
+    let live = (state()).Videos |> Array.find (fun item -> item.Id=projectVideo.id)
+    let wav = live.Artifacts |> Array.tryFind (fun artifact -> artifact.Kind="audio" && File.Exists(artifact.Path))
+    require wav.IsSome "Auto-extract did not write a WAV for the project recording"
+    pass "project.auto-extract" wav.Value.Path
+    if live.Artifacts |> Array.exists (fun artifact -> artifact.Kind="bitcube" && File.Exists(artifact.Path)) |> not then
+        run "bitcube" [] [||] |> ignore
+    let ready = (state()).Videos |> Array.find (fun item -> item.Id=projectVideo.id)
+    let cube = ready.Artifacts |> Array.find (fun artifact -> artifact.Kind="bitcube" && File.Exists(artifact.Path))
+    use asset = JsonDocument.Parse(File.ReadAllText(cube.Path))
+    let ok, missingDoc, missingIdentity = StudioBitCube.requiredCubeFieldsPresent asset.RootElement
+    require ok ("Bitcube missing fields: " + String.Join(", ", Array.append missingDoc missingIdentity))
+    let uid = text "uid" asset.RootElement
+    require (uid.StartsWith("ga:cube_ihdr:")) "Bitcube uid is not a cube_ihdr identity"
+    pass "project.bitcube" $"{uid} at {cube.Path}"
     report true ""
 with error->
     report false error.Message

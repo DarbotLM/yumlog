@@ -17,7 +17,7 @@ page.on("requestfailed", item => {
   if (detail !== "net::ERR_ABORTED") console.log(item.url(), detail);
 });
 await page.getByRole("heading", { name: "Capture Review", exact: true }).first().waitFor();
-const labels = ["Video", "Screenshot", "Audio", "Transcript", "Agents", "Voices", "Insights", "Library", "Harvest", "Settings"];
+const labels = ["Video", "Screenshot", "Audio", "Transcript", "Agents", "Voices", "Insights", "bitcube", "Library", "Harvest", "Settings"];
 assert.deepEqual((await page.getByRole("tab").locator("span").allTextContents()), labels);
 const go = label => page.getByRole("tab", { name: label, exact: true }).click();
 const video = page.locator("#player");
@@ -82,6 +82,9 @@ await page.screenshot({ path: process.argv[2], fullPage: true, animations: "disa
 
 await page.setViewportSize({ width: 480, height: 760 });
 await page.getByRole("button", { name: "Toggle library", exact: true }).click();
+await page.getByText("Project / Workspace", { exact: false }).waitFor();
+await page.getByRole("button", { name: "New project", exact: true }).waitFor();
+await page.getByRole("button", { name: "Refresh context", exact: true }).waitFor();
 await page.getByLabel("Find a recording").fill("nonsense");
 await page.getByText("No matching recordings.", { exact: true }).waitFor();
 await page.getByRole("button", { name: "Toggle library", exact: true }).click();

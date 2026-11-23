@@ -65,6 +65,7 @@
     <Compile Include="VoiceTools\StudioDiarization.fs" />
     <Compile Include="StudioAgentVoices.fs" />
     <Compile Include="StudioSemantic.fs" />
+    <Compile Include="StudioBitCube.fs" />
     <Compile Include="DesktopLibrary.fs" />
     <Compile Include="NativeUi.fs" />
     <Compile Include="Program.fs" />
