@@ -73,7 +73,22 @@ if ((Test-Path -LiteralPath $stub) -and -not (Test-Path -LiteralPath (Join-Path 
 # `yumlog` on the user PATH (the installer adds the Yumlog.Native.Cli folder) forwards to the real CLI.
 Set-Content -LiteralPath (Join-Path $stage 'Yumlog.Native.Cli\yumlog.cmd') -Value "@echo off`r`n`"%~dp0Yumlog.Native.Cli.exe`" %*`r`n" -Encoding ascii -NoNewline
 
+# Bundle the repo-local FFmpeg (launchers\install.ps1 downloads it there), or else the FFmpeg on PATH.
+# install.ps1 skips the download when FFmpeg is already on PATH, so without this fallback such a machine
+# built a package with no FFmpeg, which Test-YumlogProductionPackage.ps1 then rejects.
 $ffmpeg = Join-Path $repoRoot '.tools\ffmpeg\bin\ffmpeg.exe'
+if (-not (Test-Path -LiteralPath $ffmpeg)) {
+    $onPath = Get-Command ffmpeg.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($onPath) {
+        $item = Get-Item -LiteralPath $onPath.Source
+        # WinGet exposes FFmpeg through a symbolic link; bundle the binary it points to, next to its ffprobe.
+        $ffmpeg = if ($item.LinkType -eq 'SymbolicLink' -and $item.Target) { [IO.Path]::GetFullPath([IO.Path]::Combine((Split-Path -Parent $item.FullName), @($item.Target)[0])) } else { $item.FullName }
+    }
+}
+if (-not (Test-Path -LiteralPath $ffmpeg)) {
+    throw 'FFmpeg was not found in .tools\ffmpeg\bin or on PATH; run launchers\install.ps1 first. The production package bundles it.'
+}
+Write-Host "Bundling FFmpeg from $ffmpeg"
 if (Test-Path -LiteralPath $ffmpeg) {
     foreach ($nativeRoot in @('Yumlog.Native', 'Yumlog.Native.Cli')) {
         $target = Join-Path $stage "$nativeRoot\.tools\ffmpeg\bin"
