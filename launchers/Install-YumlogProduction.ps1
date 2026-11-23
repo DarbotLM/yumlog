@@ -27,6 +27,23 @@ if ($manifest.schema -ne 'urn:yumlog:release:v1' -or $manifest.version -notmatch
 
 $Destination = [IO.Path]::GetFullPath($Destination).TrimEnd('\')
 $versionRoot = Join-Path $Destination $manifest.version
+# The package ships default settings (backend ffmpeg). Carry the user's native config over an
+# upgrade or a -Force reinstall instead of resetting it; only a parseable config under this root is kept.
+$userConfig = $null
+$currentFile = Join-Path $Destination 'current.txt'
+$previousRoot = if (Test-Path -LiteralPath $currentFile) { (Get-Content -LiteralPath $currentFile -Raw).Trim() } else { $null }
+foreach ($candidateRoot in @($previousRoot, $versionRoot)) {
+    if (-not $candidateRoot -or -not ([IO.Path]::GetFullPath($candidateRoot)).StartsWith("$Destination\", [StringComparison]::OrdinalIgnoreCase)) { continue }
+    $candidateConfig = Join-Path $candidateRoot 'config\yumlog.native.json'
+    if (-not (Test-Path -LiteralPath $candidateConfig -PathType Leaf)) { continue }
+    try {
+        Get-Content -LiteralPath $candidateConfig -Raw | ConvertFrom-Json | Out-Null
+        $userConfig = [IO.File]::ReadAllBytes($candidateConfig)
+        break
+    } catch {
+        Write-Warning "Ignoring unreadable native config $candidateConfig; the packaged default is installed."
+    }
+}
 New-Item -ItemType Directory -Path $Destination -Force | Out-Null
 if (Test-Path -LiteralPath $versionRoot) {
     if (-not $Force) {
@@ -37,6 +54,11 @@ if (Test-Path -LiteralPath $versionRoot) {
 
 New-Item -ItemType Directory -Path $versionRoot -Force | Out-Null
 Copy-Item -Path (Join-Path $PackagePath '*') -Destination $versionRoot -Recurse -Force
+if ($null -ne $userConfig) {
+    $installedConfig = Join-Path $versionRoot 'config\yumlog.native.json'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $installedConfig) -Force | Out-Null
+    [IO.File]::WriteAllBytes($installedConfig, $userConfig)
+}
 # Packages up to 0.6.0 carry a CLI apphost without its dll in the Studio folder; it fails with
 # "The application to execute does not exist". Drop that stub; the real CLI lives in Yumlog.Native.Cli.
 $studioRoot = Join-Path $versionRoot 'Yumlog.Native'

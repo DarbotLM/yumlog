@@ -87,6 +87,15 @@ if (-not (Test-Path -LiteralPath (Join-Path $current 'Paperboy\Paperboy.exe'))) 
 if (-not (Test-Path -LiteralPath (Join-Path $current 'config\yumlog.native.json'))) {
     throw 'Installed native config is missing.'
 }
+# A reinstall keeps the user's native config instead of resetting it to the packaged default.
+$installedConfig = Join-Path $current 'config\yumlog.native.json'
+$userConfig = (Get-Content -LiteralPath $installedConfig -Raw | ConvertFrom-Json)
+$userConfig | Add-Member -NotePropertyName packageTestMarker -NotePropertyValue 'kept' -Force
+$userConfig | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $installedConfig -Encoding utf8
+& (Join-Path $PSScriptRoot 'Install-YumlogProduction.ps1') -PackagePath $PackagePath -Destination $InstallRoot -Force -NoUserIntegration | Out-Null
+if ((Get-Content -LiteralPath $installedConfig -Raw | ConvertFrom-Json).packageTestMarker -ne 'kept') {
+    throw 'A reinstall reset the user native config.'
+}
 
 [pscustomobject]@{
     PackageVersion = $manifest.version
