@@ -1,6 +1,6 @@
 [package]
 name = "yumlog-npu-emulator"
-version = "0.7.0"
+version = "0.7.1"
 description = "Native Yumlog NPU emulator container app"
 authors = ["Darbot Labs"]
 license = "Apache-2.0"
