@@ -40,7 +40,7 @@
   },
   "update": {
     "enabled": true,
-    "repo": "darbotlabs/Yumlog",
+    "repo": "DarbotLM/yumlog",
     "apiBase": "https://api.github.com",
     "webBase": "https://github.com",
     "timeoutMs": 4000

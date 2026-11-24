@@ -40,7 +40,7 @@ module UpdateCheck =
 
     let defaults =
         { Enabled = true
-          Repo = "darbotlabs/Yumlog"
+          Repo = "DarbotLM/yumlog"
           ApiBase = "https://api.github.com"
           WebBase = "https://github.com"
           TimeoutMs = 4000 }

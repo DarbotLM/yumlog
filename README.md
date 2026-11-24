@@ -1,5 +1,10 @@
 # darbot.yumlog
 
+The canonical public repository is
+[`DarbotLM/yumlog`](https://github.com/DarbotLM/yumlog). The original
+PowerShell-tool lineage is preserved separately in
+[`DarbotLM/yumlog_og`](https://github.com/DarbotLM/yumlog_og).
+
 ## Screen Capture & Recording
 
 darbot.yumlog provides local Windows tools for desktop screen capture, recording, and lightweight screen analysis. The legacy PowerShell tools remain available, and the native `Yumlog.Native.Cli` F# CLI is the no-PowerShell path for capture, recording orchestration, analysis manifests, follow-me step extraction, verifiable runbooks, and on-device reasoning about a recording.

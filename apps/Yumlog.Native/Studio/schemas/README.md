@@ -1,4 +1,4 @@
-This file is the gen-audio asset-object schema, copied from darbotlabs/gen-audio
+This file is the gen-audio asset-object schema, copied from DarbotLM/gen-audio
 schemas/asset-object.schema.json so Yumlog Studio's bitcube tab can implement the
 full Inverse-HDR cube contract (cube_ihdr + layer kinds, uid, rev, covered range,
 and the signal/tonality/confidence/quality layers).

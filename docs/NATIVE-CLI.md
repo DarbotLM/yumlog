@@ -41,7 +41,7 @@ transcribe --input path.wav [--model dir] [--device cpu|cuda] [--srt-out path]
            [--json-out path] [--python path] [--gen-audio-root path]
 ```
 
-Yumlog calls [darbotlabs/gen-audio](https://github.com/darbotlabs/gen-audio) only through its two
+Yumlog calls [DarbotLM/gen-audio](https://github.com/DarbotLM/gen-audio) only through its two
 CLI entry points, `python -m gen_audio.cli.render_speech` and `python -m gen_audio.cli.transcribe_vibevoice`.
 The script goes to gen-audio on stdin as UTF-8. Yumlog accepts a WAV only when its SHA-256, sample
 rate, and duration match the JSON receipt gen-audio prints. A non-zero gen-audio exit fails the

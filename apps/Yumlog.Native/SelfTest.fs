@@ -554,9 +554,9 @@ module NativeSelfTest =
             && UpdateCheck.compareVersions "1.0.0-rc.1" "1.0.0" = Some(-1)
             && UpdateCheck.compareVersions "0.7" "0.7.0" = Some 0
             && UpdateCheck.compareVersions "latest" "0.6.0" = None
-        let parsed = UpdateCheck.parseRelease """{"tag_name":"v0.7.0","html_url":"https://github.com/darbotlabs/Yumlog/releases/tag/v0.7.0","draft":false}"""
+        let parsed = UpdateCheck.parseRelease """{"tag_name":"v0.7.0","html_url":"https://github.com/DarbotLM/yumlog/releases/tag/v0.7.0","draft":false}"""
         let parseOk =
-            parsed = Some("v0.7.0", "https://github.com/darbotlabs/Yumlog/releases/tag/v0.7.0")
+            parsed = Some("v0.7.0", "https://github.com/DarbotLM/yumlog/releases/tag/v0.7.0")
             && UpdateCheck.parseRelease """{"message":"Not Found"}""" = None
             && UpdateCheck.parseRelease "not json" = None
         let settings = UpdateCheck.defaults
@@ -564,15 +564,15 @@ module NativeSelfTest =
         let evaluateOk =
             statusOf "0.6.0" = "update-available" && statusOf "0.7.0" = "up-to-date" && statusOf "0.8.0" = "ahead"
         let layered =
-            UpdateCheck.applyJson settings """{"update":{"repo":"DarbotLM/Yumlog","enabled":false,"timeoutMs":1500}}"""
+            UpdateCheck.applyJson settings """{"update":{"repo":"DarbotLM/yumlog","enabled":false,"timeoutMs":1500}}"""
             |> UpdateCheck.applyEnvironment (function
-                | "YUMLOG_UPDATE_REPO" -> Some "darbotlabs/Yumlog"
+                | "YUMLOG_UPDATE_REPO" -> Some "DarbotLM/yumlog"
                 | "YUMLOG_UPDATE_CHECK" -> Some "1"
                 | _ -> None)
         let layeringOk =
-            layered.Repo = "darbotlabs/Yumlog" && layered.Enabled && layered.TimeoutMs = 1500
+            layered.Repo = "DarbotLM/yumlog" && layered.Enabled && layered.TimeoutMs = 1500
             && (UpdateCheck.applyJson settings "{ broken").Repo = settings.Repo
-            && UpdateCheck.isValidRepo "darbotlabs/Yumlog" && not (UpdateCheck.isValidRepo "https://evil/x")
+            && UpdateCheck.isValidRepo "DarbotLM/yumlog" && not (UpdateCheck.isValidRepo "https://evil/x")
         let disabled = (UpdateCheck.check { settings with Enabled = false } "0.6.0").GetAwaiter().GetResult()
         let watch = Diagnostics.Stopwatch.StartNew()
         // Port 9 (discard) on loopback refuses at once: the check must answer "unavailable", not throw.
@@ -581,7 +581,7 @@ module NativeSelfTest =
         let offlineOk = offline.Status = "unavailable" && watch.ElapsedMilliseconds < 5000L
         let logOk =
             let line = UpdateCheck.logLine offline
-            line.Contains("update-check repo=darbotlabs/Yumlog") && line.Contains("result=unavailable")
+            line.Contains("update-check repo=DarbotLM/yumlog") && line.Contains("result=unavailable")
         [| check "update.semver.compare" semverOk "v-prefix, +build, numeric minor, prerelease and two-part versions"
            check "update.release.parse" parseOk "tag_name/html_url read; error bodies and bad JSON rejected"
            check "update.evaluate" evaluateOk "older, equal and newer running versions"

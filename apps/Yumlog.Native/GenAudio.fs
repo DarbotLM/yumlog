@@ -8,7 +8,7 @@ open System.Security.Cryptography
 open System.Text
 open System.Text.Json
 
-/// Boundary to darbotlabs/gen-audio speech synthesis and VibeVoice transcription.
+/// Boundary to DarbotLM/gen-audio speech synthesis and VibeVoice transcription.
 /// Yumlog never imports gen-audio code. It runs gen-audio's own command-line entry
 /// points (python -m gen_audio.cli.render_speech and gen_audio.cli.transcribe_vibevoice),
 /// reads their JSON receipts, and verifies the files they write. Every child is

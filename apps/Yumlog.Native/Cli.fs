@@ -52,7 +52,7 @@ update-check, specs:
   (<data root>\Studio\Exports\SystemSpecs) unless --out-dir is given.
 
 gen-audio (speak, transcribe):
-  Runs darbotlabs/gen-audio's CLIs through Python. Defaults come from GEN_AUDIO_PYTHON, GEN_AUDIO_ROOT,
+  Runs DarbotLM/gen-audio's CLIs through Python. Defaults come from GEN_AUDIO_PYTHON, GEN_AUDIO_ROOT,
   YUMLOG_GEN_AUDIO_ENGINE (kokoro_onnx), YUMLOG_GEN_AUDIO_VOICE and GEN_AUDIO_VIBEVOICE_ASR_MODEL.
 
 record encoding:

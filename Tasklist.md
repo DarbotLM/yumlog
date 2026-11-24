@@ -105,7 +105,7 @@ To get started with darbot.yumlog, set up your environment as follows:
 ### Cloning the Repository
 
 ```powershell
-git clone https://github.com/darbotlabs/Yumlog.git
+git clone https://github.com/DarbotLM/yumlog.git
 cd Yumlog
 ```
 

@@ -1,4 +1,4 @@
 owner: Darbot
 created: 2026-11-21 17:43:16 PT (America/Los_Angeles)
 job: t854u install/build/launch latest Yumlog Studio
-command: git clone --branch main --single-branch https://github.com/darbotlabs/Yumlog.git D:\darbot\Yumlog
+command: git clone --branch main --single-branch https://github.com/DarbotLM/yumlog.git D:\darbot\Yumlog

@@ -1,4 +1,4 @@
-# gen-audio boundary contract: Yumlog drives darbotlabs/gen-audio only through its CLIs
+# gen-audio boundary contract: Yumlog drives DarbotLM/gen-audio only through its CLIs
 # (gen_audio.cli.render_speech, gen_audio.cli.transcribe_vibevoice) and verifies their receipts.
 # The default run uses a stdlib-only stub of those two entry points, so it needs Python but no
 # models. Pass -LiveRoot/-LivePython/-LiveVoice to also render real speech with a gen-audio checkout.
