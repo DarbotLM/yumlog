@@ -6,10 +6,10 @@ or a working proxy to OCR, Paperboy, Foundry, or Widget Studio backends.
 
 ## Prerequisites and console mode
 
-Requires Windows and a .NET 11 SDK supporting `net11.0-windows` (currently
-preview). Restore includes `Microsoft.Extensions.Hosting.WindowsServices`
-`11.0.0-preview.5.26302.115`. Framework-dependent execution needs compatible
-.NET 11 and ASP.NET Core runtimes; .NET 10 alone is insufficient.
+Requires Windows and .NET SDK 10.0.4xx or 11. `apps\Yumlog.Dotnet.props`
+selects the framework and matching `Microsoft.Extensions.Hosting.WindowsServices`
+package line. Framework-dependent execution needs the corresponding .NET and
+ASP.NET Core runtimes.
 
 Run from the repository root in PowerShell. Console mode requires no elevation
 and does not install a Windows Service:

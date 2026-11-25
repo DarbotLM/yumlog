@@ -22,7 +22,7 @@ it captures frames first, then analyzes them; it is not a background daemon.
 ## Build and runtime requirements
 
 The F# project targets **`net10.0-windows10.0.26100.0` / `win-x64`**, uses Windows Forms,
-and references **`Microsoft.WindowsAppSDK.AI` 2.2.3**. Build with the .NET 10 SDK (or a compatible
+and references **`Microsoft.WindowsAppSDK.AI` 2.3.4**. Build with the .NET 10 SDK (or a compatible
 newer SDK) and restored Windows targeting packs. Framework-dependent output requires the x64
 .NET 10 runtime **and Windows Desktop runtime**; the Windows App SDK payload does not replace
 those .NET frameworks.
@@ -75,11 +75,9 @@ Required package source assets are `Assets\StoreLogo.png`, `Assets\Square44x44Lo
 publish/layout directories, certificates, or test output.
 
 The older project `/t:PackageMsix` target is a separate **unsigned, build-output-based** path:
-it uses Paperboy.Desktop's `WindowsAppSDK128.png` / `WindowsAppSDK240.png` as logos and defaults
+it uses the three native manifest logos under `Assets` and defaults
 to the Windows SDK `10.0.26100.0` `makeappx.exe` path (override `YumlogMakeAppx` if necessary).
-Those two legacy image inputs are absent from this checkout; that packaging target cannot
-complete until its asset inputs are supplied or corrected. The new launcher uses the native
-assets listed above instead. The older target is not the self-contained publish/sign/install
+The target is not the self-contained publish/sign/install
 workflow above.
 
 ## Capability kinds

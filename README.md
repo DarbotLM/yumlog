@@ -7,6 +7,10 @@ PowerShell-tool lineage is preserved separately in
 
 ## Screen Capture & Recording
 
+[Developer site](https://darbotlm.github.io/yumlog/) |
+[SDK and framework guide](docs/SDK-FRAMEWORK.md) |
+[Agent Plugin 1.0 and MCP](docs/AGENT-PLUGIN.md)
+
 darbot.yumlog provides local Windows tools for desktop screen capture, recording, and lightweight screen analysis. The legacy PowerShell tools remain available, and the native `Yumlog.Native.Cli` F# CLI is the no-PowerShell path for capture, recording orchestration, analysis manifests, follow-me step extraction, verifiable runbooks, and on-device reasoning about a recording.
 
 Two reference documents cover the native path in depth:
@@ -56,7 +60,7 @@ Run the examples below from the repository root on Windows.
 | `Skills`, `launchers`, `snap` | PowerShell utilities, packaging/service launchers, and fast screenshot executable | [Development guide](Tasklist.md) |
 
 Use the .NET SDK versions required by the component projects: Paperboy, APIM,
-and Widget Studio target .NET 11, while Yumlog.Native targets .NET 10 with
+and Widget Studio select .NET 10 or 11 from the active SDK, while Yumlog.Native targets .NET 10 with
 Windows 11 24H2 projections. Install matching runtimes for framework-dependent
 execution, including the Windows Desktop runtime for Paperboy Desktop and
 Yumlog.Native.
@@ -147,12 +151,12 @@ It does not modify system-wide certificate or service state.
 
 #### Agent client protocol and Agent Plugin 1.0
 
-Paperboy exposes the same MCP tools over standard stdio NDJSON (with legacy
-`Content-Length` compatibility) and a loopback HTTP host:
+Paperboy exposes MCP over stdio NDJSON (with legacy `Content-Length`
+compatibility) and a read-only subset through a loopback HTTP host:
 
 ```powershell
-.\apps\Paperboy.Mcp\bin\Release\net11.0-windows\Paperboy.Mcp.exe --http `
-  --url http://127.0.0.1:5117
+$bin = .\launchers\Get-YumlogBuildOutput.ps1 -Project Paperboy.Mcp
+& (Join-Path $bin 'Paperboy.Mcp.exe') --http
 ```
 
 The installed Paperboy UI can start and stop this host from **APIM Surface**.

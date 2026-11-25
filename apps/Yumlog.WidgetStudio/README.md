@@ -12,8 +12,8 @@ install widgets, or schedule refreshes.
 
 ## Prerequisites
 
-- .NET 11 SDK supporting `net11.0` (currently preview); .NET 10 alone cannot build it.
-- A compatible .NET 11 runtime for framework-dependent output. Unlike APIM,
+- .NET SDK 10.0.4xx or 11; `apps\Yumlog.Dotnet.props` selects `net10.0` or `net11.0`.
+- A matching .NET runtime for framework-dependent output. Unlike APIM,
   this project has no Windows-specific target or ASP.NET Core dependency.
 - PowerShell for the examples below, run from the **repository root**. No
   elevation, running APIM service, Windows AI/OCR, or FFmpeg is required.

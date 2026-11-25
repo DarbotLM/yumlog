@@ -30,9 +30,10 @@ version **0.7.1**.
 
 ## Requirements and architecture
 
-- Windows and a .NET 11 SDK supporting `net11.0-windows` (currently a preview SDK)
-  are required to build. Framework-dependent desktop output needs the matching
-  .NET Windows Desktop runtime; the MCP console host needs the .NET runtime.
+- Build on Windows with .NET SDK 10.0.4xx or 11. The shared project props select
+  `net10.0-windows` or `net11.0-windows`. Framework-dependent desktop output
+  needs the matching Windows Desktop runtime; the MCP project references both
+  Windows Desktop and ASP.NET Core.
 - The desktop uses WPF plus Windows Forms `NotifyIcon`; it does not depend on
   the Windows App SDK runtime. Both projects currently have no NuGet package
   references.
@@ -49,9 +50,8 @@ version **0.7.1**.
 
 The main window references `Assets\WindowsAppSDK128.png` for branding, but that
 image is not currently present in this source tree. Building succeeds without
-it; the branding image therefore needs to be supplied separately. The legacy
-Yumlog.Native `PackageMsix` target also references that image and
-`Assets\WindowsAppSDK240.png`; neither is included here.
+it; the branding image therefore needs to be supplied separately. Yumlog
+Studio uses its own YLS assets and does not depend on this Paperboy image.
 
 Bundle processing is local, but this is not a network sandbox: model downloads
 can access the network, configurable HTTP/Foundry endpoints may be remote, and
@@ -107,7 +107,8 @@ lengths, and SHA-256 hashes.
 Paperboy includes a companion console MCP host:
 
 ```powershell
-.\apps\Paperboy.Mcp\bin\Release\net11.0-windows\Paperboy.Mcp.exe
+$bin = .\launchers\Get-YumlogBuildOutput.ps1 -Project Paperboy.Mcp
+& (Join-Path $bin 'Paperboy.Mcp.exe') --ndjson
 ```
 
 Build first, then configure the executable above as the client's stdio command.
@@ -116,13 +117,14 @@ also starts the host; avoid build output on the protocol stream when integrating
 clients. Desktop output additionally supports `Paperboy.exe --mcp` without
 starting its windows or tray.
 
-The host advertises protocol version `2024-11-05` and currently requires
-`Content-Length: <UTF-8 byte count>\r\n\r\n` framing, not newline-delimited JSON.
-Clients must support that framing. `--verbose` logs host lifecycle messages to
+The host negotiates `2025-06-18`, `2025-03-26`, or `2024-11-05`. It accepts
+newline-delimited JSON and legacy `Content-Length` framing. See the
+[Agent Plugin and MCP guide](../../docs/AGENT-PLUGIN.md) for HTTP, SSE, and
+the transport-specific tool permissions. `--verbose` logs host lifecycle messages to
 stderr; `PAPERBOY_DEBUG=1` also enables server diagnostics. Closing stdin stops
 the host; the console host also handles Ctrl+C.
 
-It exposes 17 tools over stdio JSON-RPC/MCP (the five `paperboy.pmm.*` tools are
+It exposes 18 tools over stdio JSON-RPC/MCP (the five `paperboy.pmm.*` tools are
 listed under Model Manager below):
 
 - `paperboy.bundle.pack`
@@ -133,6 +135,7 @@ listed under Model Manager below):
 - `paperboy.foundryLocal.modelCards`
 - `paperboy.cards.list`
 - `paperboy.cards.schema`
+- `paperboy.cards.videoSchema`
 - `paperboy.capabilities.list`
 - `paperboy.extensions.list`
 - `paperboy.extensions.describe`
