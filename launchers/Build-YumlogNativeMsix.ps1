@@ -8,6 +8,8 @@ param(
     [string]$OutputRoot = (Join-Path $PSScriptRoot "..\dist\Yumlog.Native"),
     [string]$DotnetPath = "dotnet",
     [string]$ProductionPackagePath,
+    [ValidateRange(0, 65535)]
+    [int]$PackageRevision = 0,
     [switch]$NoSign,
     [switch]$ForceNewCertificate
 )
@@ -109,6 +111,8 @@ if ($version -notmatch '^\d+\.\d+\.\d+$' -or $packageVersion -ne "$version.0" -o
     $identity.ProcessorArchitecture -ne "x64" -or $application.Count -ne 1 -or $application[0].Executable -ne "$assemblyName.exe") {
     throw "The MSIX manifest must match the project version and the existing Yumlog Native package identity."
 }
+$packageVersion = "$version.$PackageRevision"
+$identity.Version = $packageVersion
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 if (-not $ProductionPackagePath) {
@@ -180,7 +184,7 @@ if (Test-Path -LiteralPath $layoutDirectory) {
 New-Item -ItemType Directory -Path $layoutDirectory -Force | Out-Null
 
 Copy-Item -Path (Join-Path $publishDirectory "*") -Destination $layoutDirectory -Recurse -Force
-Copy-Item -LiteralPath $manifestSource -Destination (Join-Path $layoutDirectory "AppxManifest.xml") -Force
+$manifest.Save((Join-Path $layoutDirectory "AppxManifest.xml"))
 
 $assetsSource = Join-Path $projectDirectory "Assets"
 if (Test-Path -LiteralPath $assetsSource) {
@@ -220,7 +224,7 @@ Get-ChildItem -LiteralPath (Split-Path -Parent $ffmpeg) -File -Force |
 Copy-Item -LiteralPath $configSource -Destination (Join-Path $layoutDirectory "config") -Recurse -Force
 foreach ($artifact in @("$assemblyName.exe", "$assemblyName.dll", "Yumlog.Native.Cli.exe", "Yumlog.Native.Cli.dll")) {
     $fileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $layoutDirectory $artifact)).FileVersion
-    if ($fileVersion -ne $packageVersion) { throw "Unexpected binary version '$fileVersion' for $artifact; expected $packageVersion." }
+    if ($fileVersion -ne "$version.0") { throw "Unexpected binary version '$fileVersion' for $artifact; expected $version.0." }
 }
 
 $makeappx = Find-WindowsSdkTool -ToolName "makeappx.exe"

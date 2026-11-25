@@ -178,10 +178,15 @@ and update the existing package family with the existing launchers:
 .\launchers\Install-YumlogNativeMsix.ps1
 ```
 
-The MSIX installer selects the checkout's exact version, rejects mismatches
+The MSIX installer selects the checkout's product version and highest numeric
+package revision, rejects mismatches
 and downgrades, updates in place without uninstalling user data, and verifies
 the installed identity and executable versions. For an explicit package outside
-a checkout, pass both `-PackagePath` and `-ExpectedVersion`. Signing requires a
+a checkout, pass both `-PackagePath` and `-ExpectedVersion`. A four-part expected
+version requires that exact package revision. Windows requires a new revision
+for changed package contents: use `Build-YumlogNativeMsix.ps1 -PackageRevision 1`
+to package app version `0.7.1` as `0.7.1.1` without changing its app version or
+removing user data. Signing requires a
 certificate trusted by the installing machine; the build does not change trust.
 
 #### Agent client protocol and Agent Plugin 1.0

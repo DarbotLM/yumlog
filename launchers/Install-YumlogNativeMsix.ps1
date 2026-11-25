@@ -57,18 +57,29 @@ function Assert-PackageManifest {
 if (-not $ExpectedVersion) {
     $ExpectedVersion = & (Join-Path $launcherRoot "Get-YumlogVersion.ps1")
 }
-if ($ExpectedVersion -match '^\d+\.\d+\.\d+$') { $ExpectedVersion += ".0" }
-if ($ExpectedVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+if ($ExpectedVersion -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
     throw "Pass -ExpectedVersion when running outside a Yumlog checkout."
 }
-$expectedPackageVersion = [version]$ExpectedVersion
+$expectedProductVersion = ([version]$ExpectedVersion).ToString(3)
+$exactPackageVersion = if ($ExpectedVersion -match '^\d+\.\d+\.\d+\.\d+$') { $ExpectedVersion } else { $null }
 
 if (-not $PackagePath) {
-    $PackagePath = Join-Path $OutputRoot "${packageName}_${ExpectedVersion}_x64.msix"
+    if ($exactPackageVersion) {
+        $PackagePath = Join-Path $OutputRoot "${packageName}_${exactPackageVersion}_x64.msix"
+    } elseif (Test-Path -LiteralPath $OutputRoot -PathType Container) {
+        $pattern = '^' + [regex]::Escape("${packageName}_${expectedProductVersion}.") + '(\d{1,5})_x64\.msix$'
+        $candidate = Get-ChildItem -LiteralPath $OutputRoot -File |
+            Where-Object { $_.Name -match $pattern -and [int]$Matches[1] -le 65535 } |
+            Sort-Object { [version](($_.BaseName -split '_')[1]) } -Descending |
+            Select-Object -First 1
+        if ($candidate) { $PackagePath = $candidate.FullName }
+    }
+    if (-not $PackagePath) { $PackagePath = Join-Path $OutputRoot "${packageName}_${expectedProductVersion}.0_x64.msix" }
 }
 
 if (-not (Test-Path -LiteralPath $PackagePath -PathType Leaf) -and $BuildIfMissing -and -not $PSBoundParameters.ContainsKey("PackagePath")) {
-    & (Join-Path $launcherRoot "Build-YumlogNativeMsix.ps1") -OutputRoot $OutputRoot -DotnetPath $DotnetPath | Out-Host
+    $revision = if ($exactPackageVersion) { ([version]$exactPackageVersion).Revision } else { 0 }
+    & (Join-Path $launcherRoot "Build-YumlogNativeMsix.ps1") -OutputRoot $OutputRoot -DotnetPath $DotnetPath -PackageRevision $revision | Out-Host
 }
 
 if (-not (Test-Path -LiteralPath $PackagePath -PathType Leaf)) {
@@ -76,7 +87,16 @@ if (-not (Test-Path -LiteralPath $PackagePath -PathType Leaf)) {
 }
 
 $PackagePath = (Resolve-Path -LiteralPath $PackagePath).Path
-Assert-PackageManifest -Manifest (Read-MsixManifest -Path $PackagePath)
+$packageManifest = Read-MsixManifest -Path $PackagePath
+$manifestVersion = [string]$packageManifest.Package.Identity.Version
+if ($manifestVersion -notmatch '^\d+\.\d+\.\d+\.\d+$' -or
+    ([version]$manifestVersion).ToString(3) -ne $expectedProductVersion -or
+    ($exactPackageVersion -and $manifestVersion -ne $exactPackageVersion)) {
+    throw "Package version '$manifestVersion' does not match expected version '$ExpectedVersion'."
+}
+$ExpectedVersion = $manifestVersion
+$expectedPackageVersion = [version]$ExpectedVersion
+Assert-PackageManifest -Manifest $packageManifest
 $installed = @(Get-AppxPackage -Name $packageName -ErrorAction Stop)
 foreach ($existing in $installed) {
     if ($existing.PackageFamilyName -cne $packageFamily -or $existing.Publisher -cne $publisher) {
@@ -88,7 +108,7 @@ foreach ($existing in $installed) {
 }
 
 # Update the same family in place. Reinstall never removes the package or its user data.
-Add-AppxPackage -Path $PackagePath -ForceApplicationShutdown:$Reinstall -ForceUpdateFromAnyVersion:$Reinstall -ErrorAction Stop
+Add-AppxPackage -Path $PackagePath -ForceApplicationShutdown:$Reinstall -ErrorAction Stop
 
 $packages = @(Get-AppxPackage -Name $packageName -ErrorAction Stop | Where-Object { $_.PackageFamilyName -ceq $packageFamily })
 if ($packages.Count -ne 1 -or [version]$packages[0].Version -ne $expectedPackageVersion -or $packages[0].Publisher -cne $publisher) {
@@ -98,10 +118,10 @@ $package = $packages[0]
 Assert-PackageManifest -Manifest (Get-AppxPackageManifest -Package $package.PackageFullName -ErrorAction Stop)
 foreach ($artifact in @("Yumlog.Native.exe", "Yumlog.Native.dll", "Yumlog.Native.Cli.exe", "Yumlog.Native.Cli.dll")) {
     $path = Join-Path $package.InstallLocation $artifact
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or [Diagnostics.FileVersionInfo]::GetVersionInfo($path).FileVersion -ne $ExpectedVersion) {
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or [Diagnostics.FileVersionInfo]::GetVersionInfo($path).FileVersion -ne "$expectedProductVersion.0") {
         throw "Installed binary is missing or has the wrong version: $path"
     }
-    if ($artifact.EndsWith(".dll") -and [Reflection.AssemblyName]::GetAssemblyName($path).Version -ne $expectedPackageVersion) {
+    if ($artifact.EndsWith(".dll") -and [Reflection.AssemblyName]::GetAssemblyName($path).Version -ne [version]"$expectedProductVersion.0") {
         throw "Installed assembly has the wrong version: $path"
     }
 }
