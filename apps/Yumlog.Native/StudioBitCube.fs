@@ -124,7 +124,12 @@ module StudioBitCube =
         info.ArgumentList.Add("--png")
         info.ArgumentList.Add(png)
         info.ArgumentList.Add("--stem")
-        info.ArgumentList.Add(if String.IsNullOrWhiteSpace(stem) then (match Path.GetFileNameWithoutExtension(wav) with | null -> "cube" | name -> name) else stem)
+        let cubeStem =
+            if String.IsNullOrWhiteSpace(stem) then
+                let fileStem: string | null = Path.GetFileNameWithoutExtension(wav)
+                fileStem |> Option.ofObj |> Option.defaultValue "cube"
+            else stem
+        info.ArgumentList.Add(cubeStem)
         info.ArgumentList.Add("--engine")
         info.ArgumentList.Add(if String.IsNullOrWhiteSpace(resolved.Engine) then "yumlog" else resolved.Engine)
         if not (String.IsNullOrWhiteSpace(label)) then

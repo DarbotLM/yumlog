@@ -50,10 +50,7 @@ h1, h2, h3, h4, p { margin: 0; }
 }
 .brand { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 700; letter-spacing: -.6px; white-space: nowrap; }
 .brand small { color: var(--muted); font-size: inherit; font-weight: 430; }
-.brand-mark { display: flex; align-items: center; justify-content: center; gap: 3px; width: 32px; height: 32px; border-radius: 9px; background: var(--accent); }
-.brand-mark i { width: 4px; border-radius: 5px; height: 10px; background: #253a1e; transform: skewX(-13deg); }
-.brand-mark i:nth-child(2) { height: 18px; }
-.brand-mark i:nth-child(3) { height: 13px; }
+.brand-mark { flex: none; }
 .header-actions { display: flex; gap: 9px; margin-left: auto; }
 .button, .icon-button {
   background: #282f39;

@@ -125,7 +125,8 @@ module NativeUi =
         Application.EnableVisualStyles()
         Application.SetCompatibleTextRenderingDefault(false)
         let workspace = DesktopLibrary.Workspace(appRoot)
-        use form = new Form(Text = "Yumlog Studio", StartPosition = FormStartPosition.CenterScreen,
+        use studioIcon = new Icon(Path.Combine(AppContext.BaseDirectory, "Assets", "Yumlog.ico"))
+        use form = new Form(Text = "Yumlog Studio", Icon = studioIcon, StartPosition = FormStartPosition.CenterScreen,
                             MinimumSize = Size(460, 600), Size = Size(1350, 900), BackColor = Color.FromArgb(17, 20, 25))
         use browser = new WebView2(Dock = DockStyle.Fill, DefaultBackgroundColor = Color.FromArgb(17, 20, 25))
         form.Controls.Add(browser)

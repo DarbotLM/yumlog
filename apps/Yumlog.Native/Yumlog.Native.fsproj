@@ -12,6 +12,7 @@
     <WindowsAppSdkUndockedRegFreeWinRTInitialize>false</WindowsAppSdkUndockedRegFreeWinRTInitialize>
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>Yumlog.Native</AssemblyName>
+    <ApplicationIcon>Assets\Yumlog.ico</ApplicationIcon>
     <RootNamespace>Yumlog.Native</RootNamespace>
     <Nullable>enable</Nullable>
     <!-- Nullness analysis is clean; keep it that way. -->
@@ -54,6 +55,7 @@
     <!-- The Windows App SDK tooling adds the manifest logos as Content without a copy rule; projects that
          reference Yumlog.Native (qa\studio-smoke) then fail with MSB3030 looking for them in this output. -->
     <Content Update="Assets\*.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Yumlog.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Desktop dependencies stay out of the shared CLI compile lists. -->
@@ -134,20 +136,8 @@
       DestinationFiles="$(YumlogNativePackageLayout)\AppxManifest.xml"
       SkipUnchangedFiles="false" />
 
-    <Copy
-      SourceFiles="$(MSBuildProjectDirectory)\..\Paperboy.Desktop\Assets\WindowsAppSDK128.png"
-      DestinationFiles="$(YumlogNativePackageLayout)\Assets\StoreLogo.png"
-      SkipUnchangedFiles="false" />
-
-    <Copy
-      SourceFiles="$(MSBuildProjectDirectory)\..\Paperboy.Desktop\Assets\WindowsAppSDK128.png"
-      DestinationFiles="$(YumlogNativePackageLayout)\Assets\Square44x44Logo.png"
-      SkipUnchangedFiles="false" />
-
-    <Copy
-      SourceFiles="$(MSBuildProjectDirectory)\..\Paperboy.Desktop\Assets\WindowsAppSDK240.png"
-      DestinationFiles="$(YumlogNativePackageLayout)\Assets\Square150x150Logo.png"
-      SkipUnchangedFiles="false" />
+    <Copy SourceFiles="Assets\StoreLogo.png;Assets\Square44x44Logo.png;Assets\Square150x150Logo.png"
+          DestinationFolder="$(YumlogNativePackageLayout)\Assets" />
 
     <Delete Files="$(YumlogNativeMsixPath)" />
     <Exec Command="&quot;$(YumlogMakeAppx)&quot; pack /d &quot;$(YumlogNativePackageLayout)&quot; /p &quot;$(YumlogNativeMsixPath)&quot; /o" />
