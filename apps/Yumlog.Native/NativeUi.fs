@@ -25,6 +25,9 @@ module NativeUi =
         | ".wav" -> "audio/wav"
         | ".jpg" | ".jpeg" -> "image/jpeg"
         | ".png" -> "image/png"
+        | ".webp" -> "image/webp"
+        | ".gif" -> "image/gif"
+        | ".bmp" -> "image/bmp"
         | _ -> "application/octet-stream"
 
     // WebView2 can seek within a stream. For a partial response, expose only the
@@ -147,6 +150,10 @@ module NativeUi =
         let choose command payload =
             let artifactId = DesktopLibrary.field "artifactId" payload
             match command with
+            | "chooseScreenshotsDirectory" ->
+                use dialog = new FolderBrowserDialog(Description = "Choose a screenshot photo folder", UseDescriptionForTitle = true,
+                                                     ShowNewFolderButton = false)
+                if dialog.ShowDialog(form) = DialogResult.OK then Some [| dialog.SelectedPath |] else None
             | "import" ->
                 let extensions = DesktopMedia.videoExtensions |> Seq.map (fun item -> "*" + item) |> String.concat ";"
                 chooseFiles true $"Video recordings|{extensions}"

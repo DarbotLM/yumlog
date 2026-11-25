@@ -38,6 +38,9 @@ let atomicLibrary = null;
 let libraryRevision = 0;
 let bitcubeAsset = null;
 let bitcubeRevision = 0;
+let photoQuery = "";
+let photoPage = 0;
+let selectedPhoto = "";
 let atomicQuery = "";
 let atomicModality = "all";
 let atomicPage = 0;
@@ -147,7 +150,13 @@ async function run(command, payload = {}) {
     }
     if (command === "readArtifact") previews.set(payload.artifactId, reply.data || "");
     if (command === "saveSettings") {
-      for (const name of ["outputDirectory", "ffmpegPath", "whisperPath", "whisperModel", "genAudioPython", "genAudioRoot", "genAudioEngine", "genAudioVoice", "vibeVoiceModel"]) drafts.delete("settings:" + name);
+      for (const name of ["outputDirectory", "screenshotDirectory", "ffmpegPath", "whisperPath", "whisperModel", "genAudioPython", "genAudioRoot", "genAudioEngine", "genAudioVoice", "vibeVoiceModel"]) drafts.delete("settings:" + name);
+    }
+    if (["refreshScreenshots", "chooseScreenshotsDirectory", "setScreenshotDirectory", "saveSettings"].includes(command)) {
+      photoPage = 0;
+      selectedPhoto = "";
+      stageKey = "";
+      drafts.delete("settings:screenshotDirectory");
     }
     render();
     status(reply.message || "Ready");
@@ -485,6 +494,74 @@ function outputList(items, { frames = false } = {}) {
     list.append(control);
   }
   return list;
+}
+
+function photoGallery() {
+  const gallery = state.screenshotGallery;
+  const wrap = element("section", "photo-gallery");
+  wrap.setAttribute("aria-label", "Screenshot photo gallery");
+  wrap.append(element("h3", "", "Screenshot photo gallery"));
+  const folder = element("p", "photo-directory", gallery?.directory || state.settings.screenshotDirectory || "");
+  const summary = element("p", "hint", gallery?.message || "Loading the screenshot folder...");
+  summary.setAttribute("role", "status");
+  wrap.append(folder, summary, stack(
+    act("Refresh photos", "refreshScreenshots"),
+    act("Choose screenshot folder", "chooseScreenshotsDirectory")));
+  const photos = gallery?.photos || [];
+  if (!photos.length) return wrap;
+  const search = element("input", "photo-search");
+  Object.assign(search, { type: "search", placeholder: "Find a photo", value: photoQuery });
+  search.setAttribute("aria-label", "Find a photo");
+  const preview = element("div", "photo-preview");
+  const grid = element("div", "photo-grid");
+  const pager = element("div", "surface-toolbar");
+  const updatePreview = () => {
+    preview.replaceChildren();
+    const photo = photos.find(item => item.id === selectedPhoto);
+    if (!photo) return;
+    const image = element("img", "art-preview");
+    Object.assign(image, { src: media(photo.id), alt: photo.name, decoding: "async" });
+    image.addEventListener("error", () => {
+      image.replaceWith(element("p", "hint", "This photo cannot be decoded or is no longer available. Refresh the gallery."));
+    });
+    preview.append(element("h4", "", photo.name), image,
+      act("Open photo", "openScreenshot", { photoId: photo.id }),
+      button("Close photo preview", () => { selectedPhoto = ""; updateTiles(); }));
+  };
+  const updateTiles = () => {
+    const filtered = photos.filter(item => item.name.toLocaleLowerCase().includes(photoQuery.toLocaleLowerCase()));
+    const pages = Math.max(1, Math.ceil(filtered.length / 48));
+    photoPage = Math.min(photoPage, pages - 1);
+    grid.replaceChildren();
+    for (const photo of filtered.slice(photoPage * 48, (photoPage + 1) * 48)) {
+      const tile = button("", () => {
+        selectedPhoto = photo.id;
+        updateTiles();
+        Array.from(grid.children).find(item => item.dataset.photo === photo.id)?.focus();
+      }, { className: "photo-tile" });
+      tile.dataset.photo = photo.id;
+      tile.title = photo.name;
+      tile.setAttribute("aria-label", photo.name);
+      tile.setAttribute("aria-pressed", String(selectedPhoto === photo.id));
+      const image = element("img");
+      Object.assign(image, { src: media(photo.id), alt: "", loading: "lazy", decoding: "async" });
+      image.addEventListener("error", () => {
+        image.replaceWith(element("span", "photo-unavailable", "Preview unavailable"));
+      });
+      tile.append(image, element("span", "photo-name", photo.name),
+        element("small", "", new Date(photo.modifiedAt).toLocaleString()));
+      grid.append(tile);
+    }
+    if (!filtered.length) grid.append(element("p", "hint", "No matching photos."));
+    pager.replaceChildren(element("span", "", `${filtered.length} photos - page ${photoPage + 1} of ${pages}`),
+      button("Previous photos", () => { photoPage--; updateTiles(); }, { enabled: photoPage > 0 }),
+      button("Next photos", () => { photoPage++; updateTiles(); }, { enabled: photoPage + 1 < pages }));
+    updatePreview();
+  };
+  search.addEventListener("input", () => { photoQuery = search.value; photoPage = 0; updateTiles(); });
+  wrap.append(search, preview, grid, pager);
+  updateTiles();
+  return wrap;
 }
 
 function audioPlayer(item) {
@@ -910,7 +987,8 @@ function renderFront(item) {
   const face = $("tool-face");
   const key = [active, item?.id, item?.exists, clipPreview, ...state.artifacts.map(output => output.id),
     capabilities.length, voices.length, previews.size, libraryRevision, bitcubeRevision, JSON.stringify(item?.media),
-    active === "settings" ? JSON.stringify(state.settings) : "", ["transcript", "insights", "voices"].includes(active) ? selectedOutput : "",
+    active === "settings" ? JSON.stringify(state.settings) : "", active === "screenshot" ? JSON.stringify(state.screenshotGallery) : "",
+    ["transcript", "insights", "voices"].includes(active) ? selectedOutput : "",
     ["agents", "voices"].includes(active) ? agentVoiceRevision : "", voiceSlice?.voice.id, voiceSlice?.index].join(":");
   // Keep the native media element stable when a command returns the same view.
   if (key === stageKey) return;
@@ -934,6 +1012,7 @@ function renderFront(item) {
       const images = outputs("frame", "screenshot");
       contents = images.length ? [outputList(images, { frames: true })] :
         [empty("Screenshots and frames", "Capture the desktop or pick a timestamp or scene from the recording.")];
+      contents.unshift(photoGallery());
       break;
     }
     case "audio": {
@@ -1193,13 +1272,14 @@ function renderPane() {
           act("Open output folder", "openOutput")));
       break;
     case "settings": {
-      const labels = { outputDirectory: "Output directory", ffmpegPath: "FFmpeg executable",
+      const labels = { outputDirectory: "Output directory", screenshotDirectory: "Screenshot photo directory", ffmpegPath: "FFmpeg executable",
         whisperPath: "whisper.cpp executable", whisperModel: "Whisper model file",
         genAudioPython: "gen-audio Python executable", genAudioRoot: "gen-audio checkout folder (optional)",
         genAudioEngine: "gen-audio engine (default kokoro_onnx)", genAudioVoice: "gen-audio voice",
         vibeVoiceModel: "VibeVoice ASR checkpoint folder" };
       const fields = Object.entries(labels).map(([key, title]) => [key, field(title, key, state.settings[key] || "")]);
       actions.push(label("Local tools"), ...fields.map(([, value]) => value.wrapper),
+        hint("The photo gallery reads this folder without moving, editing or uploading its images. Missing folders are shown as unavailable, not created."),
         hint("Leave FFmpeg blank to use Yumlog’s existing configuration or PATH. Leave gen-audio fields blank to use GEN_AUDIO_PYTHON, GEN_AUDIO_ROOT, GEN_AUDIO_VIBEVOICE_ASR_MODEL and the YUMLOG_GEN_AUDIO_* variables."),
         stack(act("Save settings", "saveSettings", () => Object.fromEntries(fields.map(([key, value]) => [key, value.value()])), { primary: true })));
       break;

@@ -16,6 +16,7 @@ open Yumlog.Native.Mdkg
 module DesktopLibrary =
     type Settings =
         { OutputDirectory: string
+          ScreenshotDirectory: string
           CardSize: string
           FfmpegPath: string
           WhisperPath: string
@@ -32,6 +33,19 @@ module DesktopLibrary =
           Path: string
           Start: Nullable<float>
           Duration: Nullable<float> }
+
+    type Photo =
+        { Id: string
+          Name: string
+          ModifiedAt: DateTimeOffset
+          Bytes: int64 }
+
+    type ScreenshotGallery =
+        { Directory: string
+          Status: string
+          Message: string
+          Photos: Photo array
+          Truncated: bool }
 
     type Video =
         { Id: string
@@ -69,7 +83,8 @@ module DesktopLibrary =
              Outputs = [| "video"; "clip" |]; Actions = [| "import"; "record"; "clip"; "openSource" |] }
            { Key = "screenshot"; Label = "Screenshot"; Role = "screen-and-scene-capture"
              Inputs = [| "recording"; "timestamp"; "sceneThreshold"; "frameLimit" |]
-             Outputs = [| "frame"; "screenshot"; "systemSpecs" |]; Actions = [| "capture"; "systemSpecs"; "frame"; "scenes" |] }
+             Outputs = [| "frame"; "screenshot"; "systemSpecs"; "photoGallery" |]
+             Actions = [| "capture"; "systemSpecs"; "frame"; "scenes"; "refreshScreenshots"; "chooseScreenshotsDirectory" |] }
            { Key = "audio"; Label = "Audio"; Role = "audio-extraction"
              Inputs = [| "audioTrack" |]; Outputs = [| "audio"; "spectrogram" |]; Actions = [| "wave"; "spectrogram" |] }
            { Key = "transcript"; Label = "Transcript"; Role = "caption-and-speech-transcription"
@@ -100,6 +115,8 @@ module DesktopLibrary =
              Actions = [| "saveSettings"; "setSize"; "openOutput" |] } |]
 
     let cardSizes = [| "compact"; "studio"; "wide" |]
+    let defaultScreenshotDirectory = @"C:\Users\darbot\Pictures\Screenshots"
+    let private photoExtensions = set [ ".png"; ".jpg"; ".jpeg"; ".webp"; ".gif"; ".bmp" ]
     let cardSchema = "https://darbotlabs.github.io/yumlog/paperboy-video-card.schema.json"
 
     let private key (path: string) =
@@ -184,18 +201,26 @@ module DesktopLibrary =
 
     type Workspace(root: string) =
         let settings =
-            { OutputDirectory = Path.Combine(root, "Exports"); CardSize = "studio"
+            { OutputDirectory = Path.Combine(root, "Exports"); ScreenshotDirectory = defaultScreenshotDirectory; CardSize = "studio"
               FfmpegPath = ""; WhisperPath = ""; WhisperModel = ""
               GenAudioPython = ""; GenAudioRoot = ""; GenAudioEngine = ""; GenAudioVoice = ""; VibeVoiceModel = "" }
         let statePath = Path.Combine(root, "studio.json")
         let defaults = { Settings = settings; SelectedId = ""; Videos = [||]; Captures = [||]; Projects = [||]; SelectedProjectId = "" }
         let normalize (library: Library) =
+            let screenshotDirectory =
+                if String.IsNullOrWhiteSpace(library.Settings.ScreenshotDirectory) then defaultScreenshotDirectory
+                else library.Settings.ScreenshotDirectory
             { library with
+                Settings = { library.Settings with ScreenshotDirectory = screenshotDirectory }
                 SelectedProjectId = orEmptyIfNull library.SelectedProjectId
                 Projects = if obj.ReferenceEquals(library.Projects, null) then [||] else library.Projects
                 Videos = library.Videos |> Array.map (fun video -> { video with ProjectId = orEmptyIfNull video.ProjectId }) }
         let mutable state = normalize (if File.Exists(statePath) then NativeJson.readOver defaults statePath else defaults)
         let mediaPaths = ConcurrentDictionary<string, string>(StringComparer.Ordinal)
+        let photoPaths = ConcurrentDictionary<string, string>(StringComparer.Ordinal)
+        let mutable gallery =
+            { Directory = state.Settings.ScreenshotDirectory; Status = "missing"; Message = "Screenshot folder is unavailable."
+              Photos = [||]; Truncated = false }
         let config () = NativeConfig.load NativeConfig.defaultConfigPath
         let recordConfig () =
             let original = (config ()).Record
@@ -374,10 +399,70 @@ module DesktopLibrary =
         let register (id: string) (path: string) =
             if File.Exists(path) then mediaPaths[id] <- path
 
-        member _.TryGetMedia(id: string) =
-            match mediaPaths.TryGetValue(id) with
-            | true, path -> Some path
+        let refreshScreenshots () =
+            photoPaths.Clear()
+            let folder = state.Settings.ScreenshotDirectory
+            let unavailable status message =
+                photoPaths.Clear()
+                gallery <- { Directory = folder; Status = status; Message = message; Photos = [||]; Truncated = false }
+            try
+                let directory = DirectoryInfo(folder)
+                let attributes = File.GetAttributes(folder)
+                if attributes.HasFlag(FileAttributes.ReparsePoint) then
+                    unavailable "unavailable" "Choose the actual screenshot folder rather than a directory link."
+                else
+                    let options = EnumerationOptions(RecurseSubdirectories = false, IgnoreInaccessible = false,
+                                                     AttributesToSkip = FileAttributes.ReparsePoint)
+                    // Bound both the directory scan and the WebView payload; never recurse into linked folders.
+                    let entries = directory.EnumerateFiles("*", options) |> Seq.truncate 10001 |> Seq.toArray
+                    let photos =
+                        entries |> Seq.truncate 10000
+                        |> Seq.filter (fun file -> photoExtensions.Contains(DesktopMedia.extension file.Name))
+                        |> Seq.sortBy (fun file -> -file.LastWriteTimeUtc.Ticks, file.Name)
+                        |> Seq.truncate 2001 |> Seq.toArray
+                    let truncated = entries.Length > 10000 || photos.Length > 2000
+                    let rows =
+                        photos |> Array.truncate 2000 |> Array.map (fun file ->
+                            let id = "photo-" + key file.FullName
+                            photoPaths[id] <- file.FullName
+                            { Id = id; Name = file.Name; ModifiedAt = DateTimeOffset(file.LastWriteTimeUtc); Bytes = file.Length })
+                    gallery <-
+                        { Directory = folder; Status = if rows.Length = 0 then "empty" else "ready"
+                          Message = if truncated then "Gallery limited to 2,000 photos from the first 10,000 files. Choose a smaller folder to see more."
+                                    elif rows.Length = 0 then "No PNG, JPEG, WebP, GIF or BMP photos in this folder."
+                                    else $"{rows.Length} photos. Newest first."
+                          Photos = rows; Truncated = truncated }
+            with
+            | :? DirectoryNotFoundException
+            | :? FileNotFoundException -> unavailable "missing" "Screenshot folder not found. Choose a folder or update its path in Settings."
+            | :? UnauthorizedAccessException -> unavailable "unavailable" "Access to the screenshot folder was denied."
+            | :? IOException as error -> unavailable "unavailable" $"Screenshot folder could not be read: {error.Message}"
+            | :? ArgumentException
+            | :? NotSupportedException -> unavailable "unavailable" "The screenshot directory path is invalid. Update it in Settings."
+
+        let photoPath id =
+            match photoPaths.TryGetValue(id) with
+            | true, path ->
+                try
+                    if not (File.GetAttributes(gallery.Directory).HasFlag(FileAttributes.ReparsePoint))
+                       && not (File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint))
+                       && String.Equals((Path.GetDirectoryName(path) |> orEmptyIfNull).TrimEnd('\\'),
+                                        gallery.Directory.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) then
+                        Some path
+                    else None
+                with
+                | :? IOException
+                | :? UnauthorizedAccessException -> None
             | _ -> None
+
+        do refreshScreenshots ()
+
+        member _.TryGetMedia(id: string) =
+            if id.StartsWith("photo-", StringComparison.Ordinal) then photoPath id
+            else
+                match mediaPaths.TryGetValue(id) with
+                | true, path -> Some path
+                | _ -> None
 
         member _.Snapshot() =
             let active = selected ()
@@ -404,6 +489,7 @@ module DesktopLibrary =
                workspacePath = state.Settings.OutputDirectory
                projects = projects
                settings = state.Settings
+               screenshotGallery = gallery
                tabs = tabs
                artifacts = Array.map descriptor outputs
                artifactPaths = outputs |> Array.map (fun item -> item.Id, item.Path) |> dict
@@ -434,6 +520,20 @@ module DesktopLibrary =
 
             match command with
             | "snapshot" -> result ""
+            | "refreshScreenshots" ->
+                refreshScreenshots ()
+                result gallery.Message
+            | "chooseScreenshotsDirectory"
+            | "setScreenshotDirectory" ->
+                let folder = if command = "chooseScreenshotsDirectory" then path () else get "screenshotDirectory"
+                if not (Path.IsPathFullyQualified(folder)) then invalidArg "screenshotDirectory" "Enter an absolute screenshot directory."
+                save { state with Settings = { state.Settings with ScreenshotDirectory = Path.GetFullPath(folder) } }
+                refreshScreenshots ()
+                result gallery.Message
+            | "openScreenshot" ->
+                let photo = photoPath (get "photoId") |> Option.defaultWith (fun () -> invalidOp "The selected photo is unavailable. Refresh the gallery.")
+                openFile photo
+                result ""
             | "selectProject" ->
                 let id = get "projectId"
                 if id <> "" && projectById id = None then invalidOp "Project not found."
@@ -494,6 +594,9 @@ module DesktopLibrary =
             | "saveSettings" ->
                 let output = get "outputDirectory"
                 if not (Path.IsPathFullyQualified(output)) then invalidArg "outputDirectory" "Enter an absolute output directory."
+                let screenshots = (get "screenshotDirectory").Trim()
+                let screenshots = if screenshots = "" then state.Settings.ScreenshotDirectory else screenshots
+                if not (Path.IsPathFullyQualified(screenshots)) then invalidArg "screenshotDirectory" "Enter an absolute screenshot directory."
                 let file name =
                     let value = (get name).Trim()
                     if value <> "" && (not (Path.IsPathFullyQualified(value)) || not (File.Exists(value))) then
@@ -505,13 +608,15 @@ module DesktopLibrary =
                         invalidOp $"The configured folder for {name} is unavailable."
                     value
                 let updated =
-                    { state.Settings with OutputDirectory = Path.GetFullPath(output); FfmpegPath = file "ffmpegPath"
+                    { state.Settings with OutputDirectory = Path.GetFullPath(output); ScreenshotDirectory = Path.GetFullPath(screenshots)
+                                          FfmpegPath = file "ffmpegPath"
                                           WhisperPath = file "whisperPath"; WhisperModel = file "whisperModel"
                                           GenAudioPython = file "genAudioPython"; GenAudioRoot = folder "genAudioRoot"
                                           GenAudioEngine = (get "genAudioEngine").Trim(); GenAudioVoice = (get "genAudioVoice").Trim()
                                           VibeVoiceModel = folder "vibeVoiceModel" }
                 Directory.CreateDirectory(updated.OutputDirectory) |> ignore
                 save { state with Settings = updated }
+                refreshScreenshots ()
                 result "Settings saved."
             | "record" ->
                 let duration = bounded "duration" 1.0 600.0 payload |> int

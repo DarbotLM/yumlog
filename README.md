@@ -134,11 +134,28 @@ FFmpeg and FFprobe enable video inspection and exports. Configure an optional
 `whisper-cli` executable and model under **Settings** for local speech
 transcription. **Voices** uses the installed Windows speech voices.
 
+The **Screenshot** tab also includes a read-only photo tile gallery. Its default
+folder is `C:\Users\darbot\Pictures\Screenshots`; **Choose screenshot folder** or
+**Settings > Screenshot photo directory** changes the saved location. Existing
+libraries keep their recordings and settings when this default is added.
+Yumlog never creates a missing photo folder, substitutes another profile's
+folder, or moves/uploads its images. Missing and unreadable folders have an
+explicit status.
+
+The gallery lists top-level PNG, JPEG, WebP, GIF and BMP files newest first,
+with filename search, 48 tiles per page, lazy previews and an **Open photo**
+action. **Refresh photos** discovers changes. Directory links and linked files
+are excluded; the scan stops after 10,000 files and displays at most 2,000
+photos with a visible limit notice. Video frames and desktop capture tools
+remain available in the same tab.
+
 #### Build and install the production package
 
 The release flow publishes self-contained `win-x64` Native, Paperboy, MCP, APIM,
 and Widget Studio payloads, bundles the local FFmpeg runtime, and writes per
 component payload digests.
+Use a GA .NET SDK for production so self-contained packages do not bundle
+preview runtimes.
 
 ```powershell
 .\launchers\Build-YumlogProduction.ps1
@@ -146,8 +163,26 @@ component payload digests.
 .\launchers\Install-YumlogProduction.ps1
 ```
 
-The installer creates versioned user-local binaries and Start Menu shortcuts.
-It does not modify system-wide certificate or service state.
+The installer creates versioned user-local binaries and stable **(Portable)**
+Start Menu shortcuts, validates component versions before replacing an install,
+and preserves the user's native configuration. Package acceptance verifies all
+six component versions and payload digests, then runs the installed CLI and
+Widget Studio self-tests. It does not modify system-wide certificate or service state.
+
+The Windows app named **Yumlog Native** is a separate MSIX identity. Updating the
+portable folder alone does not update that Start entry or a pin to it. Build
+and update the existing package family with the existing launchers:
+
+```powershell
+.\launchers\Build-YumlogNativeMsix.ps1
+.\launchers\Install-YumlogNativeMsix.ps1
+```
+
+The MSIX installer selects the checkout's exact version, rejects mismatches
+and downgrades, updates in place without uninstalling user data, and verifies
+the installed identity and executable versions. For an explicit package outside
+a checkout, pass both `-PackagePath` and `-ExpectedVersion`. Signing requires a
+certificate trusted by the installing machine; the build does not change trust.
 
 #### Agent client protocol and Agent Plugin 1.0
 
@@ -303,9 +338,10 @@ cargo check
 
 The first implementation exposes Tauri commands for `TextRecognizer`-style state, provisioning, model inventory, trace journal, container runtime probing, and recognition request acceptance. The next integration step is a local HTTP or named-pipe bridge so `Yumlog.Native.Cli` can call the emulator through a first-class `--ocr npu-emulator` mode.
 The MSIX launcher requires Windows SDK `makeappx.exe` and rebuilds the package
-layout under the specified output root. **Omitting `-NoSign` creates/reuses a
-signing certificate and modifies CurrentUser certificate trust.** Installation
-is a separate explicit action. The older project `PackageMsix` target references
+layout under the specified output root, including native/CLI payloads, configuration,
+FFmpeg and available FFprobe runtime files. **Omitting `-NoSign` creates/reuses a
+signing certificate and exports its public certificate, but does not change
+certificate trust.** Installation is a separate explicit action. The older project `PackageMsix` target references
 two missing Paperboy image assets; use the documented native launcher instead.
 See the [packaging details](apps/Yumlog.Native/EXTENSIBILITY.md#package-identity-and-ocr)
 before running install or OCR helpers.

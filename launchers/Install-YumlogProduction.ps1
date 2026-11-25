@@ -25,8 +25,28 @@ if ($manifest.schema -ne 'urn:yumlog:release:v1' -or $manifest.version -notmatch
     throw "Unsupported package version '$($manifest.version)'."
 }
 
+$PackagePath = (Resolve-Path -LiteralPath $PackagePath).Path.TrimEnd('\')
+# Reject mismatched release bits before replacing an existing installation.
+foreach ($component in @($manifest.components)) {
+    if ($component.path -notmatch '^[A-Za-z0-9][A-Za-z0-9.]*\\[A-Za-z0-9][A-Za-z0-9.]*\.exe$') { throw "Invalid release component path: $($component.path)" }
+    $exe = Join-Path $PackagePath $component.path
+    foreach ($path in @($exe, [IO.Path]::ChangeExtension($exe, '.dll'))) {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or [Diagnostics.FileVersionInfo]::GetVersionInfo($path).FileVersion -ne "$($manifest.version).0") {
+            throw "Release component is missing or has the wrong version: $path"
+        }
+    }
+    if ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -ne $component.sha256) {
+        throw "Apphost hash mismatch: $($component.path)"
+    }
+}
+if (@($manifest.components).Count -eq 0) { throw 'The package manifest has no release components.' }
+
 $Destination = [IO.Path]::GetFullPath($Destination).TrimEnd('\')
 $versionRoot = Join-Path $Destination $manifest.version
+if ($PackagePath -eq $versionRoot -or $PackagePath.StartsWith("$versionRoot\", [StringComparison]::OrdinalIgnoreCase) -or
+    $versionRoot.StartsWith("$PackagePath\", [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'The package source and installed version directory must not overlap.'
+}
 # The package ships default settings (backend ffmpeg). Carry the user's native config over an
 # upgrade or a -Force reinstall instead of resetting it; only a parseable config under this root is kept.
 $userConfig = $null
@@ -105,21 +125,39 @@ if (-not $NoUserIntegration) {
     $shell = New-Object -ComObject WScript.Shell
     $shortcutDirectory = Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs\DarbotLabs Yumlog'
     New-Item -ItemType Directory -Path $shortcutDirectory -Force | Out-Null
-    # Retire only this suite's versioned shortcuts; anything else in the folder is left alone.
-    Get-ChildItem -LiteralPath $shortcutDirectory -Filter '*.lnk' |
-        Where-Object { $_.Name -match '^(Yumlog Native|Yumlog Widget Studio|Paperboy) \d+\.\d+\.\d+\.lnk$' -and $_.Name -notlike "* $($manifest.version).lnk" } |
-        Remove-Item -Force
+    $shortcutTargets = @{
+        'Yumlog Native' = 'Yumlog.Native\Yumlog.Native.exe'
+        'Paperboy' = 'Paperboy\Paperboy.exe'
+        'Yumlog Widget Studio' = 'Yumlog.WidgetStudio\Yumlog.WidgetStudio.exe'
+    }
+    # A name alone does not establish ownership; remove only links to our versioned payload.
+    foreach ($file in Get-ChildItem -LiteralPath $shortcutDirectory -Filter '*.lnk' -File) {
+        if ($file.Name -match '^(Yumlog Native|Yumlog Widget Studio|Paperboy) (\d+\.\d+\.\d+)\.lnk$') {
+            $ownedTarget = Join-Path (Join-Path $Destination $Matches[2]) $shortcutTargets[$Matches[1]]
+            if ($shell.CreateShortcut($file.FullName).TargetPath -eq $ownedTarget) {
+                Remove-Item -LiteralPath $file.FullName -Force
+            }
+        }
+    }
 
     foreach ($shortcut in @(
-        @{ Name = "Yumlog Native $($manifest.version).lnk"; Target = Join-Path $versionRoot 'Yumlog.Native\Yumlog.Native.exe'; Arguments = '' }
-        @{ Name = "Paperboy $($manifest.version).lnk"; Target = Join-Path $versionRoot 'Paperboy\Paperboy.exe'; Arguments = '' }
-        @{ Name = "Yumlog Widget Studio $($manifest.version).lnk"; Target = Join-Path $versionRoot 'Yumlog.WidgetStudio\Yumlog.WidgetStudio.exe'; Arguments = '--help' }
+        @{ Name = 'Yumlog Native'; RelativeTarget = $shortcutTargets['Yumlog Native']; Arguments = '' }
+        @{ Name = 'Paperboy'; RelativeTarget = $shortcutTargets['Paperboy']; Arguments = '' }
+        @{ Name = 'Yumlog Widget Studio'; RelativeTarget = $shortcutTargets['Yumlog Widget Studio']; Arguments = '--help' }
     )) {
-        $link = $shell.CreateShortcut((Join-Path $shortcutDirectory $shortcut.Name))
-        $link.TargetPath = $shortcut.Target
+        $linkPath = Join-Path $shortcutDirectory "$($shortcut.Name) (Portable).lnk"
+        $link = $shell.CreateShortcut($linkPath)
+        if (Test-Path -LiteralPath $linkPath) {
+            $ownedPattern = '^' + [regex]::Escape("$Destination\") + '\d+\.\d+\.\d+\\' + [regex]::Escape($shortcut.RelativeTarget) + '$'
+            if ($link.TargetPath -notmatch $ownedPattern) {
+                Write-Warning "Leaving an unrelated shortcut unchanged: $linkPath"
+                continue
+            }
+        }
+        $link.TargetPath = Join-Path $versionRoot $shortcut.RelativeTarget
         $link.Arguments = $shortcut.Arguments
-        $link.WorkingDirectory = Split-Path -Parent $shortcut.Target
-        $link.Description = "DarbotLabs $($shortcut.Name -replace '\.lnk$', '')"
+        $link.WorkingDirectory = Split-Path -Parent $link.TargetPath
+        $link.Description = "DarbotLabs $($shortcut.Name) $($manifest.version) (Portable)"
         $link.Save()
     }
 }
