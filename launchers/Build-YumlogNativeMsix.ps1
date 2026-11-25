@@ -139,6 +139,10 @@ if (-not (Test-Path -LiteralPath $ffmpeg -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $ffmpeg -PathType Leaf)) {
     throw "FFmpeg is missing. Build the production payload or run launchers\install.ps1 first."
 }
+$ffprobe = Join-Path (Split-Path -Parent $ffmpeg) "ffprobe.exe"
+if (-not (Test-Path -LiteralPath $ffprobe -PathType Leaf)) {
+    throw "FFprobe is missing beside FFmpeg. Stage a complete FFmpeg distribution and rebuild the production package."
+}
 $configSource = if ($hasProductionPayload) { Join-Path $ProductionPackagePath "config" } else { Join-Path $repoRoot "config" }
 $configPath = Join-Path $configSource "yumlog.native.json"
 Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json | Out-Null
@@ -209,7 +213,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $layoutDirectory "Yumlog.Native.Cli.
 
 $ffmpegDestination = Join-Path $layoutDirectory ".tools\ffmpeg\bin"
 New-Item -ItemType Directory -Path $ffmpegDestination -Force | Out-Null
-# Keep ffprobe and any sibling runtime DLLs alongside FFmpeg.
+# Keep FFprobe and any sibling runtime DLLs alongside FFmpeg.
 Get-ChildItem -LiteralPath (Split-Path -Parent $ffmpeg) -File -Force |
     Where-Object { $_.Name -in @("ffmpeg.exe", "ffprobe.exe") -or $_.Extension -eq ".dll" } |
     Copy-Item -Destination $ffmpegDestination -Force

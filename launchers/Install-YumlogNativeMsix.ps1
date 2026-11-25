@@ -88,7 +88,7 @@ foreach ($existing in $installed) {
 }
 
 # Update the same family in place. Reinstall never removes the package or its user data.
-Add-AppxPackage -Path $PackagePath -ForceApplicationShutdown:$Reinstall -ErrorAction Stop
+Add-AppxPackage -Path $PackagePath -ForceApplicationShutdown:$Reinstall -ForceUpdateFromAnyVersion:$Reinstall -ErrorAction Stop
 
 $packages = @(Get-AppxPackage -Name $packageName -ErrorAction Stop | Where-Object { $_.PackageFamilyName -ceq $packageFamily })
 if ($packages.Count -ne 1 -or [version]$packages[0].Version -ne $expectedPackageVersion -or $packages[0].Publisher -cne $publisher) {

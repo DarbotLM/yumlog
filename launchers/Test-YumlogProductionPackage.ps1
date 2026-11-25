@@ -114,6 +114,14 @@ if (-not (Test-Path -LiteralPath $nativeFfmpeg)) {
 if ($LASTEXITCODE -ne 0) {
     throw "Bundled FFmpeg smoke test failed."
 }
+foreach ($component in @('Yumlog.Native', 'Yumlog.Native.Cli')) {
+    $probe = Join-Path $PackagePath "$component\.tools\ffmpeg\bin\ffprobe.exe"
+    if (-not (Test-Path -LiteralPath $probe -PathType Leaf)) {
+        throw "Bundled FFprobe is missing from $component."
+    }
+    & $probe -version | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Bundled FFprobe smoke test failed for $component." }
+}
 foreach ($artifact in @('Yumlog.Native.dll', 'Yumlog.Native.exe', 'Yumlog.Native.Cli.dll')) {
     $component = if ($artifact -eq 'Yumlog.Native.Cli.dll') { 'Yumlog.Native.Cli' } else { 'Yumlog.Native' }
     if (-not (Test-Path -LiteralPath (Join-Path $PackagePath "$component\$artifact"))) {

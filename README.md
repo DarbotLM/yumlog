@@ -339,7 +339,7 @@ cargo check
 The first implementation exposes Tauri commands for `TextRecognizer`-style state, provisioning, model inventory, trace journal, container runtime probing, and recognition request acceptance. The next integration step is a local HTTP or named-pipe bridge so `Yumlog.Native.Cli` can call the emulator through a first-class `--ocr npu-emulator` mode.
 The MSIX launcher requires Windows SDK `makeappx.exe` and rebuilds the package
 layout under the specified output root, including native/CLI payloads, configuration,
-FFmpeg and available FFprobe runtime files. **Omitting `-NoSign` creates/reuses a
+FFmpeg and FFprobe runtime files. **Omitting `-NoSign` creates/reuses a
 signing certificate and exports its public certificate, but does not change
 certificate trust.** Installation is a separate explicit action. The older project `PackageMsix` target references
 two missing Paperboy image assets; use the documented native launcher instead.
