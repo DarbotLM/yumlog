@@ -22,9 +22,8 @@
     </Content>
     <Content Include="Samples\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
-    <!-- Regression fixtures run in self-test but never ship in the release package. -->
-    <Content Update="Samples\fixtures\**\*" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
 </Project>

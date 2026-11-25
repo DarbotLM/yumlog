@@ -97,12 +97,22 @@ if ((Get-Content -LiteralPath $installedConfig -Raw | ConvertFrom-Json).packageT
     throw 'A reinstall reset the user native config.'
 }
 
+$widgetStudio = Join-Path $current 'Yumlog.WidgetStudio\Yumlog.WidgetStudio.exe'
+if (-not (Test-Path -LiteralPath $widgetStudio)) {
+    throw 'Installed Widget Studio executable is missing.'
+}
+$widgetSelftest = & $widgetStudio self-test --work-dir (Join-Path $InstallRoot 'widgetstudio-selftest') 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "Installed Widget Studio self-test failed: $($widgetSelftest -join [Environment]::NewLine)"
+}
+
 [pscustomobject]@{
     PackageVersion = $manifest.version
     Components = @($manifest.components).Count
     Ffmpeg = (Get-Item -LiteralPath $nativeFfmpeg).Length
     SmokeInstall = $current
     SelfTestPassed = $true
+    WidgetSelfTestPassed = $true
 }
 
 Remove-Item -LiteralPath $InstallRoot -Recurse -Force
