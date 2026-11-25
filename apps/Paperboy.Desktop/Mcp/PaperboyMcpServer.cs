@@ -90,6 +90,7 @@ public static class PaperboyMcpServer
         "paperboy.extensions.list",
         "paperboy.extensions.describe"
     };
+    internal static IEnumerable<string> HttpToolNames => ReadOnlyHttpTools.Order(StringComparer.Ordinal);
 
     public static async Task RunAsync(Stream input, Stream output, string[] args, CancellationToken cancellationToken = default)
     {
@@ -1066,7 +1067,7 @@ public static class PaperboyMcpServer
         ["result"] = result
     };
 
-    private static JsonObject Error(JsonNode? id, int code, string message) => new()
+    internal static JsonObject Error(JsonNode? id, int code, string message) => new()
     {
         ["jsonrpc"] = "2.0",
         ["id"] = id?.DeepClone(),
@@ -1201,12 +1202,12 @@ public static class PaperboyMcpServer
     private static string NegotiatedProtocolVersion(JsonObject request)
     {
         var requested = request["params"]?["protocolVersion"]?.GetValue<string>();
-        return requested switch
-        {
-            "2025-06-18" or "2025-03-26" or "2024-11-05" => requested,
-            _ => "2024-11-05"
-        };
+        return SupportsProtocolVersion(requested) ? requested! : "2024-11-05";
     }
+
+    internal static IReadOnlyList<string> ProtocolVersions { get; } = ["2025-06-18", "2025-03-26", "2024-11-05"];
+
+    internal static bool SupportsProtocolVersion(string? version) => ProtocolVersions.Contains(version, StringComparer.Ordinal);
 
     private static string ServerVersion()
     {

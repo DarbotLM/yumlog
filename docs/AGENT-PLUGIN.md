@@ -22,6 +22,9 @@ Plugin version `1.0`, OpenAPI version `3.1.0`, and MCP protocol dates are
 different version numbers. This host negotiates `2025-06-18`, `2025-03-26`,
 or `2024-11-05`; inspect `initialize.result.protocolVersion` and decline
 an unsupported fallback before calling a tool.
+Send the negotiated value in `MCP-Protocol-Version` on subsequent `/mcp`
+requests. This host accepts a missing header for compatibility; an unsupported
+value is HTTP `400`.
 
 ## Start with stdio
 
@@ -50,7 +53,9 @@ framing convention.
 An operator who chooses HTTP starts the same executable with `--http`. Its
 default base is `http://127.0.0.1:5117`. It must remain local; no API key
 is advertised by the plugin manifest. Do not expose it through a reverse
-proxy or point a cloud plugin installer at it.
+proxy or point a cloud plugin installer at it. A client without a browser
+`Origin` is accepted; if a browser supplies one, it must match the request
+origin. Foreign origins are rejected with `403`.
 
 1. Fetch the plugin manifest and follow its OpenAPI URL, or connect directly
    to `/mcp`. `GET /health` describes the host, not model readiness.
@@ -103,6 +108,10 @@ a notification is not a tool result. Read `result.content` for tagging
 details and hashes; do not report success from HTTP `200` alone. Clients
 must handle rejected paths, unavailable Foundry models, unsupported methods,
 and interrupted streams without retrying a different transport's mutations.
+For `/mcp`, malformed JSON is `400`, an unacceptable response type is `406`,
+and a non-JSON request content type is `415`. An overloaded legacy `/message`
+queue can return `503` after 15 seconds; some earlier replies in a batch may
+already have been queued. Do not replay the entire batch blindly.
 
 [SDK and framework guide](SDK-FRAMEWORK.md) ·
 [HTTP implementation](https://github.com/DarbotLM/yumlog/blob/main/apps/Paperboy.Mcp/PaperboyMcpHttpHost.cs) ·
