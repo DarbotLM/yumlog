@@ -52,7 +52,7 @@ export default function SearchBar() {
   const keys = event => {
     if (event.key === 'Escape') { event.preventDefault(); close(); }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      const links = [...container.current.querySelectorAll('.search-results a')];
+      const links = Array.from(container.current.querySelectorAll('.search-results a'));
       if (!links.length) return;
       event.preventDefault();
       const current = links.indexOf(document.activeElement);

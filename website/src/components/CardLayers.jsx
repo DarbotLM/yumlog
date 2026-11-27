@@ -22,12 +22,13 @@ export default function CardLayers({children, title}) {
       flow.current.style.width = `${width}px`;
       flow.current.style.height = `${height}px`;
       flow.current.style.columnWidth = `${width}px`;
-      const count = Math.max(1, Math.ceil((flow.current.scrollWidth + gap - 1) / (width + gap)));
       const origin = flow.current.getBoundingClientRect().left;
-      const headings = [...flow.current.querySelectorAll('h2,h3,h4')].map(heading => ({
+      const headings = Array.from(flow.current.querySelectorAll('h2,h3,h4')).map(heading => ({
         text: heading.textContent,
         layer: Math.max(0, Math.floor((heading.getBoundingClientRect().left - origin + 1) / (width + gap))),
       }));
+      const count = Math.max(1, Math.ceil((flow.current.scrollWidth + gap - 1) / (width + gap)),
+        ...headings.map(heading => heading.layer + 1));
       let previous = title;
       const labels = Array.from({length: count}, (_, index) => {
         const heading = headings.find(item => item.layer === index);
@@ -38,11 +39,14 @@ export default function CardLayers({children, title}) {
       setLayer(current => Math.min(current, count - 1));
     };
     const schedule = () => {
+      if (disposed) return;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(measure);
     };
     const resize = new ResizeObserver(schedule);
     resize.observe(viewport.current);
+    // Fragmentation can settle after hydration without changing the viewport.
+    if (flow.current.firstElementChild) resize.observe(flow.current.firstElementChild);
     const content = new MutationObserver(schedule);
     content.observe(flow.current, {subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['open']});
     document.fonts?.ready.then(schedule);
@@ -67,7 +71,7 @@ export default function CardLayers({children, title}) {
 
   const revealFocus = event => {
     const origin = flow.current.getBoundingClientRect().left;
-    const rects = [...event.target.getClientRects()];
+    const rects = Array.from(event.target.getClientRects());
     if (!rects.length || !layout.width) return;
     const pages = rects.map(rect => Math.floor((rect.left - origin + 1) / stride));
     if (!pages.includes(layer)) setLayer(Math.max(0, Math.min(layout.labels.length - 1, pages[0])));
