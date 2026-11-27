@@ -55,7 +55,8 @@ module.exports = {
       title: 'Yumlog Studio',
       logo: { src: 'yls-header-icon.svg', alt: 'YLS' },
       items: [
-        { to: '/', label: 'Wiki deck', position: 'left' },
+        { to: '/wiki/', label: 'Wiki deck', position: 'left' },
+        { to: '/', label: 'Website', position: 'left', exact: true },
         { href: 'https://github.com/DarbotLM/yumlog/releases/latest', label: 'Install Studio', position: 'right' },
         { href: 'https://github.com/DarbotLM/yumlog', label: 'GitHub', position: 'right' },
       ],

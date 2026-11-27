@@ -1,8 +1,9 @@
 # Studio wiki
 
 The Docusaurus website publishes to `https://darbotlm.github.io/yumlog/`.
-The homepage reuses the Studio section descriptors in the root `_config.yml`;
-the eleven `content/*.mdx` articles form its full-width Wiki deck.
+The product homepage and `/wiki/` reuse the Studio section descriptors in the
+root `_config.yml`; the eleven `content/*.mdx` articles form the full-width
+Wiki deck. The top navigation keeps Website and Wiki deck separate.
 Root `docs/` files remain developer guides, including redirects from their
 previous `.html` URLs. Root Jekyll templates are not used by this build.
 
@@ -36,6 +37,9 @@ Only trusted main builds or a main workflow dispatch can deploy through the
 release packages, local media, models and native build outputs are excluded.
 The checkout step does not download Git LFS payloads.
 
-Selecting a dock or bottom tab opens `?section=<id>&face=wiki`. The other
+Selecting a dock or bottom tab opens `/wiki/?section=<id>&face=wiki`.
+Existing root `?section=...` and legacy `#view=...&section=...` links redirect
+to the wiki while preserving their query and fragment. Bare root visits open
+the product website. The other
 faces are documentation overviews, not live application controls. The website
 does not contact desktop services, capture media or invoke tools.
