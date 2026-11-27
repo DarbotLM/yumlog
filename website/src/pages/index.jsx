@@ -5,9 +5,9 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import {useHistory, useLocation} from '@docusaurus/router';
 import Glyph from '../components/StudioGlyph';
+import {useRelease, assetSize} from '../components/release';
 
 const release = 'https://github.com/DarbotLM/yumlog/releases';
-const downloads = `${release}/download/v0.7.1`;
 const workflow = [
   {number: '01', title: 'Capture the source.', section: 'video',
     description: 'Record a walkthrough, import a video, or collect approved screenshots. Keep the original media as the starting point.'},
@@ -19,6 +19,7 @@ const workflow = [
 
 export default function Website() {
   const {siteConfig} = useDocusaurusContext();
+  const currentRelease = useRelease();
   const history = useHistory();
   const location = useLocation();
   const wiki = useBaseUrl('/wiki/');
@@ -26,7 +27,7 @@ export default function Website() {
   const [selected, setSelected] = useState('video');
   const assets = siteConfig.customFields.studio.assets;
   const current = assets.find(asset => asset.id === selected);
-  const guide = id => `${wiki}?section=${id}&face=wiki`;
+  const guide = id => `${wiki}${id}/`;
 
   useEffect(() => {
     const query = new URLSearchParams(location.search);
@@ -53,7 +54,7 @@ export default function Website() {
             delivering media. From the first frame to the final handoff, keep every
             insight connected to its source.</p>
           <div className="product-actions">
-            <a className="product-button product-button-primary" href="#downloads">Get Yumlog 0.7.1</a>
+            <a className="product-button product-button-primary" href="#downloads">Get Yumlog {currentRelease.version}</a>
             <Link className="product-button" to={wiki}>Explore the Wiki deck</Link>
           </div>
           <p className="product-caption">Local-first. Windows x64. Source available on GitHub.</p>
@@ -137,25 +138,26 @@ export default function Website() {
       <section className="product-section" id="downloads" aria-labelledby="downloads-title">
         <div className="product-section-heading"><p className="wiki-eyebrow">START WITH THE PUBLISHED BUILD</p>
           <h2 id="downloads-title">Get Yumlog for Windows.</h2>
-          <p>Release 0.7.1. Choose the full toolkit or the native Studio package.
+          <p>Release {currentRelease.version}. Choose the full toolkit or the native Studio package.
             Review the installation guide and verify downloads before running them.</p></div>
         <div className="product-downloads">
           <article><span className="product-number">COMPLETE TOOLKIT</span><h3>Windows x64 suite</h3>
             <p>Studio, native CLI, Paperboy Desktop, Paperboy MCP, APIM Service and Widget Studio.
               Self-contained application binaries, with FFmpeg and FFprobe for native media tools.</p>
-            <p className="product-caption">ZIP / approximately 801 MB / six components</p>
-            <a className="product-button product-button-primary" href={`${downloads}/Yumlog-0.7.1-win-x64.zip`}>Download Windows suite</a>
-            <div className="product-download-meta"><a href={`${downloads}/Yumlog-0.7.1-win-x64.zip.sha256`}>SHA-256 checksum</a>
-              <a href={`${downloads}/release-manifest.json`}>Release manifest</a></div></article>
+            <p className="product-caption">ZIP / {assetSize(currentRelease.zip)} / {currentRelease.componentCount} components</p>
+            <a className="product-button product-button-primary" href={currentRelease.zip.url}>Download Windows suite</a>
+            <div className="product-download-meta"><a href={currentRelease.checksum.url}>SHA-256 checksum</a>
+              <a href={currentRelease.manifest.url}>Release manifest</a></div></article>
           <article><span className="product-number">NATIVE STUDIO</span><h3>Windows MSIX</h3>
             <p>The native Studio in a Windows application package. Check the package identity,
               signature and publisher before installing. Separate suite executables are not included.</p>
-            <p className="product-caption">MSIX / approximately 269 MB / version 0.7.1.0</p>
-            <a className="product-button" href={`${downloads}/DarbotLabs.Yumlog.Native_0.7.1.0_x64.msix`}>Download Native Studio</a>
+            <p className="product-caption">MSIX / {assetSize(currentRelease.msix)} / version {currentRelease.msixVersion}</p>
+            <a className="product-button" href={currentRelease.msix.url}>Download Native Studio</a>
             <div className="product-download-meta"><Link to={guide('settings')}>Installation instructions</Link>
-              <a href={`${release}/tag/v0.7.1`}>Release notes</a></div></article>
+              <a href={currentRelease.url}>Release notes</a></div></article>
         </div>
-        <p className="product-download-note">Optional speech and OCR models have separate requirements.
+        <p className="product-download-note">Release metadata checked at build time on {currentRelease.checkedAt.slice(0, 10)}.
+          Optional speech and OCR models have separate requirements.
           No installer runs from this page. <a href={`${release}/latest`}>Check for newer releases</a>.</p>
       </section>
       <footer className="product-closing"><img src={logo} alt="YLS" width="42" height="42"/>

@@ -38,10 +38,8 @@ button,input,select { font: inherit; }
 .navbar__item { font-size: 13px; }
 .studio-wiki-page .footer { display: none; }
 .studio-wiki-shell { display: grid; grid-template-columns: 244px minmax(0,1fr); flex: 1; }
-.wiki-dock { position: sticky; top: 68px; align-self: start; height: calc(100dvh - 68px); background: var(--studio-sidebar); border-right: 1px solid var(--studio-line); padding: 23px 14px; overflow-y: auto; }
+.wiki-dock { position: sticky; top: var(--ifm-navbar-height); align-self: start; height: calc(100dvh - var(--ifm-navbar-height)); background: var(--studio-sidebar); border-right: 1px solid var(--studio-line); padding: 23px 14px; overflow-y: auto; }
 .dock-label { display: flex; justify-content: space-between; gap: 6px; font: 10px/1.6 var(--ifm-font-family-monospace); letter-spacing: .08em; color: var(--studio-muted); margin-bottom: 15px; }
-.dock-search { display: grid; gap: 5px; font-size: 11px; color: var(--studio-muted); margin-bottom: 15px; }
-.dock-search input { width: 100%; background: var(--studio-well); color: var(--studio-text); border: 1px solid var(--studio-line); border-radius: 8px; padding: 10px; font-size: 12px; }
 .wiki-dock nav { display: grid; gap: 4px; }
 .wiki-dock nav a { display: flex; align-items: center; gap: 12px; min-height: 39px; padding: 8px 10px; color: var(--studio-muted); border: 1px solid var(--studio-clear); border-radius: 8px; font-size: 13px; text-decoration: none; }
 .wiki-dock nav a:hover { background: var(--studio-pane); color: var(--studio-text); }
@@ -52,21 +50,29 @@ button,input,select { font: inherit; }
 .dock-guides .dock-label { margin: 0 0 3px; }
 .install-studio { display: block; text-align: center; background: var(--studio-accent); color: var(--studio-canvas); border: 1px solid var(--studio-accent); border-radius: 8px; padding: 9px; margin-top: 20px; font-size: 12px; font-weight: 650; }
 .install-studio:hover { color: var(--studio-canvas); }
-.dock-note,.dock-empty { color: var(--studio-muted); font-size: 11px; margin: 12px 0 0; line-height: 1.7; }
+.dock-note { color: var(--studio-muted); font-size: 11px; margin: 12px 0 0; line-height: 1.7; }
 .dock-toggle { display: none; }
 .wiki-workspace { min-width: 0; padding: 30px clamp(16px,3vw,42px) 12px; }
-.wiki-workspace-heading { display: flex; align-items: center; justify-content: space-between; gap: 22px; max-width: 1320px; margin: 0 auto 23px; }
 .wiki-eyebrow { font: 10px/1.7 var(--ifm-font-family-monospace); letter-spacing: .09em; color: var(--studio-accent); margin-bottom: 7px; }
-.wiki-workspace-heading h1 { font-size: clamp(29px,3.3vw,42px); line-height: 1.1; letter-spacing: -.045em; margin: 0 0 8px; }
-.wiki-workspace-heading h1:focus { outline: none; }
-.wiki-workspace-heading p:not(.wiki-eyebrow) { margin: 0; color: var(--studio-muted); font-size: 13px; max-width: 74ch; }
-.wiki-size { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--studio-muted); white-space: nowrap; }
-.wiki-size select { background: var(--studio-pane); color: var(--studio-text); border: 1px solid var(--studio-line); border-radius: 7px; padding: 7px; }
+.header-card-size { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--studio-muted); white-space: nowrap; }
+.header-card-size select { background: var(--studio-pane); color: var(--studio-text); border: 1px solid var(--studio-line); border-radius: 7px; padding: 7px; }
+.header-search { position: relative; width: clamp(180px,22vw,320px); }
+.header-search form { margin: 0; }
+.header-search input { width: 100%; min-height: 36px; background: var(--studio-well); color: var(--studio-text); border: 1px solid var(--studio-line); border-radius: 8px; padding: 8px 12px; font-size: 12px; }
+.search-results { position: absolute; left: 0; top: calc(100% + 12px); width: min(510px,calc(100vw - 32px)); max-height: min(620px,70dvh); overflow-y: auto; padding: 12px; background: var(--studio-sidebar); border: 1px solid var(--studio-line); border-radius: 12px; z-index: 100; }
+.search-results > p { font-size: 12px; color: var(--studio-muted); padding: 4px; margin: 0 0 8px; }
+.search-results ul { list-style: none; padding: 0; margin: 0; }
+.search-results li a { display: block; padding: 12px; border-radius: 8px; color: var(--studio-text); text-decoration: none; }
+.search-results li a:hover,.search-results li a:focus { background: var(--studio-selected); }
+.search-results strong { display: block; color: var(--studio-accent); font-size: 13px; }
+.search-results span { display: block; color: var(--studio-muted); font-size: 12px; line-height: 1.6; margin-top: 5px; overflow-wrap: anywhere; }
+.search-results button { background: var(--studio-pane); color: var(--studio-text); border: 1px solid var(--studio-line); border-radius: 6px; padding: 7px 12px; margin-right: 14px; cursor: pointer; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .wiki-card { max-width: 1200px; margin: auto; border: 1px solid var(--studio-line); border-radius: 16px; background: var(--studio-well); overflow: hidden; }
 .wiki-card-header { background: var(--studio-card); min-height: 62px; padding: 12px 17px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--studio-line); }
 .wiki-card-name { display: flex; gap: 10px; align-items: center; }
 .wiki-card-name .wiki-glyph { color: var(--studio-accent); }
-.wiki-card-name h2 { font-size: 16px; margin: 0; }
+.wiki-card-name h1 { font-size: 16px; margin: 0; }
 .face-controls { display: flex; gap: 5px; flex-wrap: wrap; }
 .face-controls button,.wiki-primary,.dock-toggle { border: 1px solid var(--studio-line); border-radius: 8px; background: var(--studio-pane); color: var(--studio-text); padding: 8px 11px; min-height: 36px; font-size: 12px; cursor: pointer; }
 .face-controls button[aria-pressed='true'] { color: var(--studio-accent); border-color: var(--studio-accent); background: var(--studio-selected); }
@@ -111,7 +117,9 @@ button,input,select { font: inherit; }
   .studio-wiki-shell { grid-template-columns: 210px minmax(0,1fr); }
   .wiki-workspace { padding: 23px 14px; }
   .wiki-card-header { align-items: flex-start; }
-  .wiki-size { display: none; }
+  .header-search { width: 210px; }
+  .search-results { left: auto; right: 0; }
+  .menu__list-item .header-card-size { padding: 12px; }
   .wiki-face { padding: 22px; }
 }
 @media (max-width: 720px) {
@@ -124,8 +132,6 @@ button,input,select { font: inherit; }
   .wiki-dock nav { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .wiki-dock nav a { gap: 8px; }
   .dock-guides { padding: 15px 10px 0; }
-  .wiki-workspace-heading { margin-bottom: 18px; }
-  .wiki-workspace-heading h1 { font-size: 32px; }
   .wiki-face { padding: 18px; }
   .wiki-card-header { padding: 12px; }
   .face-controls { width: 100%; }
@@ -135,7 +141,7 @@ button,input,select { font: inherit; }
   .navbar__brand { font-size: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; transition: none !important; } }
-@media print { .navbar,.wiki-dock,.wiki-bottom-tabs,.face-controls,.footer,.wiki-size { display: none; } .studio-wiki-shell { display: block; } .wiki-card { max-width: none; border: 0; } }
+@media print { .navbar,.wiki-dock,.wiki-bottom-tabs,.face-controls,.footer { display: none; } .studio-wiki-shell { display: block; } .wiki-card { max-width: none; border: 0; } }
 
 .product-site { width: min(1240px,100%); margin: 0 auto; padding: 0 32px; }
 .product-site section[id] { scroll-margin-top: 90px; }
@@ -218,6 +224,11 @@ button,input,select { font: inherit; }
   .product-mode-buttons { grid-template-columns: repeat(4,minmax(0,1fr)); }
 }
 @media (max-width: 600px) {
+  :root,html[data-theme='dark'] { --ifm-navbar-height: 112px; }
+  .navbar__items:not(.navbar__items--right) { flex-wrap: wrap; }
+  .site-search-container { position: static !important; flex-basis: 100%; padding-top: 8px; }
+  .header-search { width: 100%; }
+  .search-results { width: 100%; }
   .product-site { padding: 0 20px; }
   .product-nav { gap: 14px; }
   .product-nav > div { gap: 18px; }

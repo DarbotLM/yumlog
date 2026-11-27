@@ -32,7 +32,7 @@ module.exports = {
   favicon: 'yls-header-icon.svg',
   trailingSlash: true,
   onBrokenLinks: 'throw',
-  markdown: { format: 'md', hooks: { onBrokenMarkdownLinks: 'throw' } },
+  markdown: { format: 'detect', hooks: { onBrokenMarkdownLinks: 'throw' } },
   staticDirectories: ['../apps/Yumlog.Native/Studio/branding'],
   customFields: { studio: { schema: wiki.schema, sourceBase: wiki.sourceBase, assets: wiki.assets } },
   presets: [['classic', {
@@ -41,12 +41,12 @@ module.exports = {
       routeBasePath: 'docs',
       sidebarPath: false,
       beforeDefaultRemarkPlugins: [sourceLinks],
-      editUrl: 'https://github.com/DarbotLM/yumlog/edit/main/',
+      editUrl: ({docPath}) => `https://github.com/DarbotLM/yumlog/edit/main/docs/${docPath}`,
     },
     blog: false,
     theme: { customCss: './src/css/studio.css' },
   }]],
-  plugins: [['@docusaurus/plugin-client-redirects', {
+  plugins: ['./plugins/studio', ['@docusaurus/plugin-client-redirects', {
     fromExtensions: ['html'],
   }]],
   themeConfig: {
@@ -57,6 +57,8 @@ module.exports = {
       items: [
         { to: '/wiki/', label: 'Wiki deck', position: 'left' },
         { to: '/', label: 'Website', position: 'left', exact: true },
+        { type: 'search', position: 'left', className: 'site-search-container' },
+        { type: 'custom-card-size', position: 'right' },
         { href: 'https://github.com/DarbotLM/yumlog/releases/latest', label: 'Install Studio', position: 'right' },
         { href: 'https://github.com/DarbotLM/yumlog', label: 'GitHub', position: 'right' },
       ],

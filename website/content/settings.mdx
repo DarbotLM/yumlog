@@ -1,55 +1,11 @@
+import ReleaseInstall from '../src/components/ReleaseInstall';
+
 ## Settings: install, configure, keep control
 
 Use the published Windows package for the application. This website is the
 wiki, not the installer or a browser control panel for your machine.
 
-### Download Yumlog 0.7.1
-
-| Download | Contents |
-|---|---|
-| [Full Windows x64 ZIP](https://github.com/DarbotLM/yumlog/releases/download/v0.7.1/Yumlog-0.7.1-win-x64.zip) | Self-contained Studio, CLI, Paperboy, MCP, APIM, and Widget Studio; 800,710,361 bytes |
-| [ZIP SHA-256](https://github.com/DarbotLM/yumlog/releases/download/v0.7.1/Yumlog-0.7.1-win-x64.zip.sha256) | Check the downloaded ZIP before extracting it |
-| [Release manifest](https://github.com/DarbotLM/yumlog/releases/download/v0.7.1/release-manifest.json) | Component versions, file counts and payload digests |
-| [Native Studio MSIX](https://github.com/DarbotLM/yumlog/releases/download/v0.7.1/DarbotLabs.Yumlog.Native_0.7.1.0_x64.msix) | Native Windows package, version 0.7.1.0; 268,747,665 bytes |
-
-See [release notes](https://github.com/DarbotLM/yumlog/releases/tag/v0.7.1)
-or [the latest published release](https://github.com/DarbotLM/yumlog/releases/latest).
-The full suite ZIP and Native MSIX are different distributions.
-
-### Instructions: verify and install the ZIP
-
-Run the following commands yourself in a working directory with room for
-the extracted suite. `downloads`, `yumlog-package`, and `yumlog-source`
-should be new directories.
-
-```powershell
-gh release download v0.7.1 --repo DarbotLM/yumlog --dir .\downloads `
-  --pattern 'Yumlog-0.7.1-win-x64.zip' --pattern 'Yumlog-0.7.1-win-x64.zip.sha256'
-$zip = '.\downloads\Yumlog-0.7.1-win-x64.zip'
-$expected = ((Get-Content "$zip.sha256" -Raw).Trim() -split '\s+')[0]
-$actual = (Get-FileHash $zip -Algorithm SHA256).Hash
-if ($actual -ne $expected) { throw 'Package checksum mismatch' }
-Expand-Archive -LiteralPath $zip -DestinationPath .\yumlog-package
-
-gh repo clone DarbotLM/yumlog .\yumlog-source -- --branch v0.7.1 --single-branch
-.\yumlog-source\launchers\Install-YumlogProduction.ps1 `
-  -PackagePath .\yumlog-package -ExpectedVersion 0.7.1
-```
-
-The [versioned production installer](https://github.com/DarbotLM/yumlog/blob/v0.7.1/launchers/Install-YumlogProduction.ps1)
-uses the package manifest, creates user-local versioned binaries and normal
-integration shortcuts, and preserves valid existing native configuration.
-Use its `-NoUserIntegration` switch if you do not want user integration.
-Do not overwrite a working installation directory manually.
-
-### MSIX alternative
-
-Inspect the package identity, signature and publisher before installation.
-Do not disable Windows signature checks or trust a certificate just to make
-an installation succeed. The
-[versioned MSIX installer](https://github.com/DarbotLM/yumlog/blob/v0.7.1/launchers/Install-YumlogNativeMsix.ps1)
-documents package checks and revision handling. The published MSIX does not
-include the full suite of separate Paperboy/APIM/Widget Studio executables.
+<ReleaseInstall />
 
 ### Tools and workspace configuration
 
