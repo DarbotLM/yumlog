@@ -5,7 +5,7 @@ The product homepage and eleven `/wiki/<section>/` routes reuse the Studio
 section descriptors in the root `_config.yml`. Each `content/*.mdx` article
 has its own rendered HTML, title and canonical URL. The top navigation keeps
 Website and Wiki deck separate, with full-text search immediately after
-Website and a shared Card size control on wiki pages.
+Website and a shared Agent Card Size control on wiki pages.
 Root `docs/` files remain developer guides, including redirects from their
 previous `.html` URLs. Root Jekyll templates are not used by this build.
 
@@ -65,8 +65,10 @@ does not contact desktop services, capture media or invoke tools.
 Search loads the generated `search-index.json` from this site only when
 used. It covers all eleven articles, generated installation commands, and
 published developer guides. Queries stay in the browser. Arrow keys, Enter,
-Escape and normal link navigation are supported. Card size persists only in
-the current browser session and does not change native Studio settings.
+Escape and normal link navigation are supported. Agent Card Size defaults
+to Wide; an explicit selection persists only in the current browser session
+and does not change native Studio settings. Wide mode uses half the normal
+top spacing above the card at each breakpoint.
 
 Product screenshots must be supplied and approved for publication. Do not
 substitute annotated website screenshots or fabricated media for native app

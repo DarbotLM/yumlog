@@ -50,9 +50,9 @@ button,input,select { font: inherit; }
 .dock-guides .dock-label { margin: 0 0 3px; }
 .install-studio { display: block; text-align: center; background: var(--studio-accent); color: var(--studio-canvas); border: 1px solid var(--studio-accent); border-radius: 8px; padding: 9px; margin-top: 20px; font-size: 12px; font-weight: 650; }
 .install-studio:hover { color: var(--studio-canvas); }
-.dock-note { color: var(--studio-muted); font-size: 11px; margin: 12px 0 0; line-height: 1.7; }
 .dock-toggle { display: none; }
 .wiki-workspace { min-width: 0; padding: 30px clamp(16px,3vw,42px) 12px; }
+[data-size='wide'] .wiki-workspace { padding-top: 15px; }
 .wiki-eyebrow { font: 10px/1.7 var(--ifm-font-family-monospace); letter-spacing: .09em; color: var(--studio-accent); margin-bottom: 7px; }
 .header-card-size { display: flex; gap: 8px; align-items: center; font-size: 11px; color: var(--studio-muted); white-space: nowrap; }
 .header-card-size select { background: var(--studio-pane); color: var(--studio-text); border: 1px solid var(--studio-line); border-radius: 7px; padding: 7px; }
@@ -116,6 +116,7 @@ button,input,select { font: inherit; }
 @media (max-width: 996px) {
   .studio-wiki-shell { grid-template-columns: 210px minmax(0,1fr); }
   .wiki-workspace { padding: 23px 14px; }
+  [data-size='wide'] .wiki-workspace { padding-top: 11.5px; }
   .wiki-card-header { align-items: flex-start; }
   .header-search { width: 210px; }
   .search-results { left: auto; right: 0; }

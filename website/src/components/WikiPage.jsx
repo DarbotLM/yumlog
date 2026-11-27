@@ -92,7 +92,6 @@ export default function StudioWiki({section}) {
             <Link to={`${docBase}NATIVE-CLI`}>Native CLI reference</Link>
           </div>
           <a className="install-studio" href={sectionHref('settings')} onClick={e => follow(e, 'settings')}>Install Yumlog {release.version}</a>
-          <p className="dock-note">Source-linked documentation.<br/>No desktop connection.</p>
         </div>
       </aside>
       <main className="wiki-workspace" id="wiki-workspace">
@@ -110,7 +109,6 @@ export default function StudioWiki({section}) {
           </header>
           <section id="wiki-card-content" className="wiki-face" aria-label={`${current.title} ${face === 'wiki' ? 'wiki deck' : face === 'paperboy' ? 'Paperboy details' : 'tool overview'}`}>
             {face === 'wiki' && <div className="wiki-article markdown">
-              <div className="wiki-face-label">BACK OF CARD / WIKI DECK <span>GUIDE, EXAMPLES &amp; INTEGRATION</span></div>
               <MDXProvider components={MDXComponents}><Article/></MDXProvider>
             </div>}
             {face === 'tool' && <div className="wiki-overview">

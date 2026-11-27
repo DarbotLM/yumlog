@@ -4,7 +4,7 @@ const Preferences = createContext(null);
 const sizes = ['compact', 'studio', 'wide'];
 
 export function WikiPreferences({children}) {
-  const [size, setSize] = useState('studio');
+  const [size, setSize] = useState('wide');
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem('yumlog.wiki.cardSize');
