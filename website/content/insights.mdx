@@ -1,0 +1,45 @@
+## Insights: distinguish measurement from inference
+
+Inspect media properties, analyze an approved frame, or turn timed evidence
+into a runbook. Keep model output separate from directly measured duration,
+codec, dimensions, timestamps and file hashes.
+
+### Instructions
+
+1. Refresh media information for the selected source.
+2. Choose a frame for OCR/analysis and inspect its availability and errors.
+   Missing evidence must stay missing.
+3. Use semantic decimation when you need source-linked atomic cards.
+   Retain the original artifacts with those cards.
+4. If the recording has an `.mdkg` sidecar, produce and review its runbook.
+
+### Example: cited runbook from existing evidence
+
+```powershell
+$bin = .\launchers\Get-YumlogBuildOutput.ps1 -Project Yumlog.Native.Cli
+$cli = Join-Path $bin 'Yumlog.Native.Cli.exe'
+& $cli runbook --input .\session.mdkg `
+  --json-out .\runbook.json --markdown-out .\runbook.md
+```
+
+This reads existing metadata; it does not capture the desktop. Retain the
+original sidecar so citations can be resolved independently.
+
+### Tools and outputs
+
+`probe`, `ocr`, `runbook`, `decimate` and `importAnalysis` cover different
+evidence paths. Importing analysis does not mean that Studio observed the
+event itself. `mediaInfo`, `ocr` and `runbook` outputs need their associated
+source identifiers and provenance.
+
+### Agents, SDK and Paperboy
+
+An MDKG citation names a layer, time and JSON pointer. Resolve it against
+the original recording's sidecar, not freshly generated OCR. A model answer
+should expose the grounding it used and acknowledge missing values.
+See [on-device reasoning](/yumlog/docs/ON-DEVICE-REASONING/),
+[evidence SDK contracts](/yumlog/docs/SDK-FRAMEWORK/), and
+[semantic implementation](https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/StudioSemantic.fs).
+
+Continue with [Library](/yumlog/?section=library&face=wiki) for distilled
+cards or [Harvest](/yumlog/?section=harvest&face=wiki) for delivery.

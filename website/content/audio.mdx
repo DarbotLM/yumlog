@@ -1,0 +1,47 @@
+## Audio: extract, inspect, preserve
+
+The Audio card separates the recording's audio track from its video.
+Extraction produces an artifact for transcription, speaker segmentation or
+bitcube analysis. It is not text-to-speech generation.
+
+### Instructions
+
+1. Select a recording and confirm that its media information lists an audio
+   track. A silent recording cannot produce a meaningful transcript.
+2. In Audio, choose **Extract WAV**. Wait for the operation result before
+   selecting the generated artifact.
+3. Play the WAV in the app and inspect its spectrogram. Keep the WAV paired
+   with the source, not just a screenshot of its frequency plot.
+4. Open Transcript for recognition, Voices for speaker work, or bitcube for
+   a source-linked audio representation.
+
+### Example workflow
+
+For a meeting excerpt, export the clip in Video first, extract its WAV in
+Audio, and use that WAV as the transcript input. Record the clip offset so
+timestamps can be related back to the full meeting.
+
+### Tools and outputs
+
+| Contract action | Input | Output |
+|---|---|---|
+| `wave` | Selected audio track | WAV artifact |
+| `spectrogram` | Audio from the selected media | Frequency visualization |
+
+Both tools depend on the installed media toolchain. The full Windows ZIP
+bundles FFmpeg and FFprobe with the native components. An absent executable
+or absent audio track should remain a visible failure, not an empty success.
+
+### Agents, SDK and Paperboy
+
+Retain codec, sample rate, channels, duration, source offset and file hash
+when handing audio to an agent. A spectrogram is a derived visualization;
+it is not evidence of recognized words or speaker identity.
+SDK consumers should use the artifact returned by the operation, rather
+than guess its output path.
+
+See [media extraction implementation](https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/DesktopMedia.fs),
+[media presets](/yumlog/docs/MEDIA-PRESETS/), and
+[installation](/yumlog/?section=settings&face=wiki).
+Continue with [Transcript](/yumlog/?section=transcript&face=wiki),
+[Voices](/yumlog/?section=voices&face=wiki) or [bitcube](/yumlog/?section=bitcube&face=wiki).

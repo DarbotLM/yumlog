@@ -1,0 +1,50 @@
+## Transcript: words tied to time
+
+Attach captions, extract embedded subtitles, or transcribe selected audio.
+Keep the original audio and time offsets with the text. A transcript is an
+interpretation, not a replacement for the recording.
+
+### Instructions
+
+1. Confirm the selected source has audio, or choose an existing caption file.
+2. Use **Attach transcript** for authored captions or **Extract subtitles**
+   for an embedded subtitle track.
+3. For speech recognition, select the configured transcription provider and
+   installed model. Review any download and hardware requirements first.
+4. Inspect timestamps and text. In Studio, clicking a timestamped cue seeks
+   the original video; corrections should retain the original time range.
+
+### Example: transcribe through Gen-Audio
+
+```powershell
+$bin = .\launchers\Get-YumlogBuildOutput.ps1 -Project Yumlog.Native.Cli
+$cli = Join-Path $bin 'Yumlog.Native.Cli.exe'
+& $cli transcribe --input .\approved-audio.wav `
+  --model C:\Models\VibeVoice-ASR --device cpu `
+  --srt-out .\transcript.srt --json-out .\transcript.json `
+  --gen-audio-root C:\src\gen-audio
+```
+
+The paths are examples, not bundled model locations. Install and configure
+Gen-Audio separately. CPU/GPU memory requirements and model readiness are
+independent of the CLI's availability.
+
+### Tools and outputs
+
+`attachTranscript`, `subtitles`, `transcribe` and `genAudioTranscribe` are
+the Studio's declared actions. Keep SRT/JSON text, source path, provider,
+model and segment boundaries with the artifact. Report missing captions,
+empty recognition, or a failed provider as such.
+
+### Agents, SDK and Paperboy
+
+An agent can quote a segment with its time range and cite the original
+audio. It should not infer identity from a speaker label or silently
+rewrite words as facts. Use Library to retain distilled evidence and
+Harvest to package transcript and source together.
+
+Read [speech CLI options](/yumlog/docs/NATIVE-CLI/),
+[Gen-Audio's source](https://github.com/DarbotLM/gen-audio),
+and [the SDK boundary](/yumlog/docs/SDK-FRAMEWORK/).
+Continue with [Library](/yumlog/?section=library&face=wiki) or
+[Harvest](/yumlog/?section=harvest&face=wiki).

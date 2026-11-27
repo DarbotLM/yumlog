@@ -1,0 +1,49 @@
+## Screenshot: a frame with context
+
+Browse your screenshot folder, extract a frame from a recording, or make a
+new capture in the Windows app. Reading this guide does not access that
+folder or take a screenshot.
+
+### Instructions
+
+1. Choose the screenshot directory in Studio and refresh the photo gallery.
+   Gallery browsing reads files; it does not move or upload them.
+2. Preview the selected image. For a video-derived frame, retain its source
+   recording and timestamp.
+3. For scene extraction, choose a threshold and frame limit. Review results
+   before using them as evidence.
+4. Use Insights for OCR and analysis. A preview or gallery tile is not an
+   OCR result.
+
+### Example: analyze an approved image
+
+```powershell
+$bin = .\launchers\Get-YumlogBuildOutput.ps1 -Project Yumlog.Native.Cli
+$cli = Join-Path $bin 'Yumlog.Native.Cli.exe'
+& $cli analyze --input .\approved-frame.png --ocr auto
+```
+
+Windows AI OCR needs a supported OS, model, hardware and package identity.
+Existing analysis flows can provision an OCR model. Inspect availability
+and error fields instead of assuming an exit code proves OCR succeeded.
+
+### Tools and outputs
+
+| Tool | Meaning |
+|---|---|
+| `refreshScreenshots`, `chooseScreenshotsDirectory` | Configure and browse the local gallery |
+| `frame`, `scenes` | Derive still images from a selected recording |
+| `capture`, `systemSpecs` | Explicit Windows capture operations with privacy implications |
+
+### Agents, SDK and Paperboy
+
+Preserve the image hash, dimensions, timestamp and source relationship when
+attaching a frame to an Agent Card. Redact private information before
+delivery. Keep model-generated text separate from directly measured image
+properties. Never replace a missing screenshot with a synthetic one and
+call it captured evidence.
+
+Read [native analysis](/yumlog/docs/NATIVE-CLI/),
+[OCR and extension readiness](https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/EXTENSIBILITY.md),
+and [gallery source](https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/DesktopLibrary.fs).
+Continue with [Insights](/yumlog/?section=insights&face=wiki).

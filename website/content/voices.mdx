@@ -1,0 +1,47 @@
+## Voices: speakers and narration are different
+
+Review speaker turns from recorded audio, or render a new narration with an
+explicitly selected voice. A diarization label does not establish a person's
+identity, and generated speech must remain labelled as generated.
+
+### Instructions
+
+1. Extract the recording's WAV in Audio before detecting speaker turns.
+2. Inspect each turn's time range and the corresponding source slice.
+   Correct segmentation before relying on speaker-level summaries.
+3. For narration, select a Windows voice or a configured Gen-Audio engine.
+   Supply the script and inspect model readiness and licensing.
+4. Keep the generated WAV and its receipt; compare duration, sample rate
+   and hash with the file actually produced.
+
+### Example narration
+
+```powershell
+$bin = .\launchers\Get-YumlogBuildOutput.ps1 -Project Yumlog.Native.Cli
+$cli = Join-Path $bin 'Yumlog.Native.Cli.exe'
+& $cli speak --text "This is a generated narration example." `
+  --out-file .\narration.wav --gen-audio-root C:\src\gen-audio
+```
+
+Configure `GEN_AUDIO_PYTHON`, `GEN_AUDIO_ROOT`, engine, voice and model paths
+for your installation. No voice pack or neural model is downloaded by this
+website. Use a voice you have permission to use.
+
+### Tools and outputs
+
+`detectAgentVoices` creates speaker/turn analysis, `agentVoices` reads it,
+`voices` lists narration choices, and `speak`/`genAudioSpeak` render audio.
+These operations produce different artifacts (`agentVoices`, `agentVoice`,
+or `voice`); do not conflate them.
+
+### Agents, SDK and Paperboy
+
+Carry source offsets and uncertainty with speaker turns. Carry engine,
+voice configuration and generation provenance with narration. For speech
+models, read the [native worker migration and known limitations](https://github.com/DarbotLM/gen-audio/blob/main/docs/PRODUCTION_COMPLETION_SPEC.md)
+instead of assuming a new package version proves native inference.
+
+Read [speech options](/yumlog/docs/NATIVE-CLI/) and
+[speaker implementation](https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/StudioAgentVoices.fs).
+Continue with [Audio](/yumlog/?section=audio&face=wiki) or
+[Harvest](/yumlog/?section=harvest&face=wiki).

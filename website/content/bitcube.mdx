@@ -1,0 +1,45 @@
+## bitcube: inspect the audio-linked layers
+
+The Inverse-HDR bitcube represents a selected recording's audio using the
+Gen-Audio `library_r3` schema. It is a derived representation, not a new
+recording and not a speech-recognition result.
+
+### Instructions
+
+1. Open a recording with an audio track and extract its WAV.
+2. Open bitcube and choose **Build bitcube**. The native host invokes the
+   configured builder; this web page does not.
+3. Inspect the cube UID, revision, covered range, frequency/time bins,
+   `inv_hdr`, `layer_score` and `layer_method`.
+4. Keep the JSON, preview image and original audio together.
+
+### Four layers
+
+| Layer | Inspect |
+|---|---|
+| signal | Signal measurements and available aggregate statistics |
+| tonality | Tonal structure values derived from the audio |
+| confidence | The defined layer measurements, not confidence that a claim is true |
+| quality | The builder's quality-layer values and method |
+
+Where available, Studio displays mean, p90 and active fraction. Missing
+statistics are not automatically zero.
+
+### Example review
+
+For two candidate narrations, compare their covered durations and method
+before comparing scores. A cube built for one WAV must not be attributed
+to another WAV that happens to share its filename.
+
+### Tools, agents and SDK
+
+The tab declares `bitcube` and `wave`. The SDK consumer must validate the
+asset fields and four expected layer kinds, preserve hashes and units, and
+keep the schema identifier intact. The Point preview is not a replacement
+for the source data.
+
+Read the [builder and validator](https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/StudioBitCube.fs),
+[vendored schema provenance](https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/Studio/schemas/README.md),
+and [Gen-Audio asset format](https://github.com/DarbotLM/gen-audio/blob/main/docs/ASSET_OBJECT_MODEL.md).
+Continue with [Audio](/yumlog/?section=audio&face=wiki) or
+[Harvest](/yumlog/?section=harvest&face=wiki).

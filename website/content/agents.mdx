@@ -1,0 +1,52 @@
+## Agents: discover before you execute
+
+The Agents card exposes native capabilities, extension declarations and
+readiness information. A listed capability is not proof of an installed
+model, running server, or permission to execute.
+
+### Instructions
+
+1. Open the capability catalog and inspect the provider, transport, input
+   schema, output schema and availability.
+2. Check OCR readiness separately from image analysis. Model provisioning
+   requires explicit operator consent.
+3. Use the registered tools only with the inputs they declare. Read the
+   result and error fields before reporting success.
+
+### Example: discovery without capture
+
+```powershell
+dotnet build .\apps\Yumlog.Native.Cli -c Release
+$bin = .\launchers\Get-YumlogBuildOutput.ps1 -Project Yumlog.Native.Cli
+$cli = Join-Path $bin 'Yumlog.Native.Cli.exe'
+& $cli extensions list --no-external
+& $cli extensions validate --dir .\apps\Yumlog.Native\Samples
+```
+
+The sample extension is illustrative. Loading its manifest does not install
+its declared models or start its targets.
+
+### Tools and integration
+
+`catalog`, `ocrStatus`, `loadOcr`, `detectAgentVoices` and `agentVoices`
+have different effects; discovery is not interchangeable with provisioning.
+For a local agent client, use `Paperboy.Mcp` over stdio or its read-only
+HTTP subset. HTTP does not expose arbitrary extension invocation.
+
+```json
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+```
+
+Send this after the MCP initialize/initialized exchange. The static wiki
+is not an MCP endpoint and never sends it on your behalf.
+
+### SDK, framework and Paperboy
+
+Use semantic IDs and versioned manifests, not shared mutable folders.
+Inspect `resources/list` and read the returned schema URIs. Keep the
+MCP protocol date, plugin version, and application version separate.
+The full stdio tool catalog has more authority than the HTTP catalog.
+
+Read the [complete agent protocol guide](/yumlog/docs/AGENT-PLUGIN/),
+[SDK and framework guide](/yumlog/docs/SDK-FRAMEWORK/), and
+[native extension contract](https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/EXTENSIBILITY.md).

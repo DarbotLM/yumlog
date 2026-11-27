@@ -1,0 +1,52 @@
+## Video: start with the source
+
+Review a recording, choose an exact range, and keep the original beside every
+derived clip. The native Video face is a player; this Wiki deck is its
+documentation, not a connected player.
+
+### Instructions
+
+1. In the installed Studio, open a video you are authorized to use. Confirm
+   its duration and whether it contains audio before planning downstream work.
+2. Preview the source and set the clip start and end. Export a clip rather
+   than changing the original file.
+3. Move to Screenshot for frames, Audio for a WAV, or Transcript for text.
+   Inspect the resulting artifacts in Harvest before sharing them.
+
+### Example: record with timed evidence
+
+After building the CLI, resolve its actual output directory instead of
+hardcoding the .NET SDK version. The recording command below captures the
+desktop: run it only with explicit participant consent.
+
+```powershell
+$bin = .\launchers\Get-YumlogBuildOutput.ps1 -Project Yumlog.Native.Cli
+$cli = Join-Path $bin 'Yumlog.Native.Cli.exe'
+& $cli record --out-file .\session.mp4 --timed-metadata-out .\session.mdkg `
+  --duration 10 --fps 30 --backend ffmpeg
+```
+
+### Tools and outputs
+
+| Operation | Input | Result |
+|---|---|---|
+| Open / preview | An existing recording | A source entry, not a copy of its content |
+| Clip | Recording plus start/end seconds | A separately exported video |
+| Record | Explicit capture settings | Video and optionally a timed `.mdkg` sidecar |
+
+Missing or moved source files are reported as unavailable. Browser codec
+support and successful capture are separate: a file may exist but need a
+compatible player.
+
+### Agents, SDK and Paperboy
+
+An agent should retain the source path, media properties, requested range and
+operation result. The Paperboy descriptor lists `import`, `record`, `clip`
+and `openSource`; those names do not give a web page permission to execute
+them. The HTTP MCP allowlist does not expose arbitrary recording.
+
+Read [CLI recording options](/yumlog/docs/NATIVE-CLI/),
+[versioned evidence contracts](/yumlog/docs/SDK-FRAMEWORK/), and the
+[Video implementation](https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/Studio/studio.js).
+Continue with [Screenshot](/yumlog/?section=screenshot&face=wiki) or
+[Audio](/yumlog/?section=audio&face=wiki).

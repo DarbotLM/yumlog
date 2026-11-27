@@ -1,0 +1,43 @@
+## Harvest: deliver the card and its evidence
+
+Harvest brings the selected recording, derived artifacts and Paperboy card
+into one delivery workflow. Packaging is not the same as publishing: review
+every file before sharing the bundle outside your machine.
+
+### Instructions
+
+1. Select the source and inspect the artifacts produced by Video,
+   Screenshot, Audio, Transcript and Insights.
+2. Review the Paperboy card's source metadata and outputs.
+3. Export card JSON or schema for an integration, or build a Paperboy bundle
+   when the receiver needs the evidence files too.
+4. Inspect the bundle manifest and hashes. Open the delivered copy and
+   verify that its references resolve.
+
+### Example delivery checklist
+
+For a narrated walkthrough, include the original recording, approved clips,
+transcript, narration receipt, cited runbook and relevant frames. Omit
+unneeded private documents, local settings, credentials and model weights.
+An exported card without referenced files may be useful metadata, but it
+is not a self-contained evidence package.
+
+### Tools and outputs
+
+`exportCard`, `copyCard`, `copySchema`, `bundle`, `openArtifact` and
+`exportArtifact` are the native actions. `cardJson` and `paperboyBundle`
+are the corresponding delivery forms. The documentation's Paperboy details
+face has no fake Save/Copy/Build buttons: it only explains this contract.
+
+### Agents, SDK and Paperboy
+
+Use versioned manifests, byte counts and SHA-256 values. Reject missing or
+mismatched payloads rather than reconstructing private source paths.
+The read-only HTTP MCP allowlist supports inspection, not bundle writes.
+Explicit local stdio permissions are a different trust boundary.
+
+Read [Paperboy bundle and extension contracts](https://github.com/DarbotLM/yumlog/blob/main/apps/Paperboy.Desktop/README.md),
+[MCP permissions](/yumlog/docs/AGENT-PLUGIN/), and
+[SDK ownership boundaries](/yumlog/docs/SDK-FRAMEWORK/).
+Return to [Library](/yumlog/?section=library&face=wiki) to review evidence
+or [Settings](/yumlog/?section=settings&face=wiki) for distribution.

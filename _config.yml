@@ -1,0 +1,271 @@
+title: Yumlog Studio
+description: Native media tools, evidence-linked workflows, and source-grounded developer guides.
+url: https://darbotlm.github.io
+baseurl: /yumlog
+repository: DarbotLM/yumlog
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+plugins:
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+relative_links:
+  enabled: true
+  collections: false
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+exclude:
+  - .dotnet11
+  - .tools
+  - dist
+  - logs
+  - Scratchpad
+  - Yumlog-Studio-YLS
+  - node_modules
+  - vendor
+
+wiki:
+  schema: urn:yumlog:wiki-ui-asset:v1
+  sourceBase: https://github.com/DarbotLM/yumlog/blob/main/
+  sections:
+    - id: overview
+      title: Overview
+      glyph: home
+      url: /
+      summary: One local Studio. Capture, inspect, and deliver evidence without losing the source.
+      detail: Start with the Windows application, explore the native tool surfaces, or read the integration guides. This website is the documentation view of the card shell, not a running capture service.
+      links:
+        - title: Source and installation
+          url: https://github.com/DarbotLM/yumlog#readme
+        - title: Release downloads
+          url: https://github.com/DarbotLM/yumlog/releases
+    - id: install
+      title: Install
+      glyph: download
+      url: /
+      summary: Choose the Windows package or the portable application suite.
+      detail: The Yumlog Native Start entry belongs to the MSIX package. Portable shortcuts are labelled separately. Match the app version and package revision, verify checksums, and trust a signing certificate only after checking its publisher.
+      command: |
+        .\launchers\Build-YumlogProduction.ps1
+        .\launchers\Test-YumlogProductionPackage.ps1
+        .\launchers\Install-YumlogProduction.ps1
+      links:
+        - title: Installation guide
+          url: https://github.com/DarbotLM/yumlog#build-and-install-the-production-package
+        - title: Release downloads
+          url: https://github.com/DarbotLM/yumlog/releases
+    - id: capture
+      title: Capture
+      glyph: video
+      url: /docs/NATIVE-CLI.html
+      summary: Capture a screen, record a session, and retain its evidence.
+      detail: The native CLI covers capture, recording, analysis, runbooks, and local reasoning. Capturing a real desktop requires operator consent; reading this site never starts a capture.
+      links:
+        - title: Native CLI source
+          url: https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native.Cli/Program.fs
+    - id: gallery
+      title: Photo gallery
+      glyph: image
+      url: /
+      summary: A read-only photo collection inside the Screenshot tab.
+      detail: Choose a screenshot directory in Studio, search its photo tiles, and open a preview. The gallery reads top-level PNG, JPEG, WebP, GIF and BMP files. Missing folders remain missing; images are not moved or uploaded by gallery browsing.
+      links:
+        - title: Gallery configuration
+          url: https://github.com/DarbotLM/yumlog#using-yumlog-studio
+        - title: Native gallery implementation
+          url: https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/DesktopLibrary.fs
+    - id: sdk
+      title: SDK & framework
+      glyph: code
+      assetIds: [agents, library, harvest]
+      url: /docs/SDK-FRAMEWORK.html
+      summary: Pick the right boundary before choosing a library.
+      detail: Native CLI commands, versioned schemas, MDKG evidence and JSON-RPC interfaces form the integration surface. Discovery, validation and execution are distinct operations.
+      links:
+        - title: Native extension contract
+          url: https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/EXTENSIBILITY.md
+    - id: protocols
+      title: Agent protocols
+      glyph: nodes
+      url: /docs/AGENT-PLUGIN.html
+      summary: Discover and connect through explicit, versioned contracts.
+      detail: Paperboy MCP supports stdio, stateless Streamable HTTP and SSE. Agent Plugin 1.0 advertises the local OpenAPI contract. ACP is a separate surface; the public wiki is not any of these endpoints.
+      links:
+        - title: HTTP host source
+          url: https://github.com/DarbotLM/yumlog/blob/main/apps/Paperboy.Mcp/PaperboyMcpHttpHost.cs
+        - title: ACP / APIM contract
+          url: https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.APIM.Service/README.md
+    - id: widgets
+      title: Widgets
+      glyph: grid
+      url: /
+      summary: Validate a declaration. Inspect its capabilities. Export a package.
+      detail: Widget Studio keeps project schemas, capability contracts and package versions separate. A preview renders the declaration; it does not install a widget or execute its capabilities.
+      command: |
+        Yumlog.WidgetStudio.exe validate widget.json
+        Yumlog.WidgetStudio.exe capabilities widget.json
+        Yumlog.WidgetStudio.exe package widget.json widget.zip
+      links:
+        - title: Widget Studio guide
+          url: https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.WidgetStudio/README.md
+        - title: Capability schema
+          url: https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.WidgetStudio/Schemas/widget-studio.capability.schema.json
+    - id: evidence
+      title: Evidence
+      glyph: layers
+      url: /
+      summary: Keep the recording, timeline and claim connected.
+      detail: MDKG citations identify a layer, timestamp and JSON pointer. Resolve proofs against the original sidecar; a generated summary is not a substitute for missing source evidence.
+      command: |
+        Yumlog.Native.Cli.exe runbook --input recording.mdkg --json-out runbook.json
+      links:
+        - title: Evidence integration guide
+          url: /docs/SDK-FRAMEWORK.html#2-read-evidence-from-an-existing-recording
+        - title: MDKG format
+          url: https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/hevc-swarm-out/MDKG-SPEC.md
+    - id: reasoning
+      title: Local reasoning
+      glyph: spark
+      url: /docs/ON-DEVICE-REASONING.html
+      summary: Read the grounding, not just the answer.
+      detail: On-device reasoning consumes selected recording metadata and explicit grounding. Model availability and output quality must be established separately from the evidence that supports a runbook.
+      links:
+        - title: Reasoning implementation
+          url: https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/OnDeviceLlm.fs
+    - id: assets
+      title: UI assets
+      glyph: card
+      url: /
+      summary: The Studio interface, expressed as source-linked semantic cards.
+      detail: Each tile has a capability face and an inspectable contract face. Colour and glyph stay together; names, inputs, outputs and source references come from the implemented Studio surfaces. These cards are documentation, not runtime telemetry.
+      links:
+        - title: Studio shell source
+          url: https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/Studio/index.html
+        - title: Native tool-tab contract
+          url: https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/DesktopLibrary.fs
+  assets:
+    - id: video
+      title: Video
+      glyph: video
+      section: capture
+      role: recording-and-clips
+      summary: Review the source recording and export a precise clip.
+      inputs: [recording, startSeconds, endSeconds, captureDuration]
+      outputs: [video, clip]
+      actions: [import, record, clip, openSource]
+      source: apps/Yumlog.Native/Studio/studio.js
+      guide: /docs/NATIVE-CLI.html#record
+    - id: screenshot
+      title: Screenshot
+      glyph: image
+      section: gallery
+      role: screen-and-scene-capture
+      summary: Browse photo tiles, capture the desktop, or extract source frames.
+      inputs: [recording, timestamp, sceneThreshold, frameLimit]
+      outputs: [frame, screenshot, systemSpecs, photoGallery]
+      actions: [capture, systemSpecs, frame, scenes, refreshScreenshots, chooseScreenshotsDirectory]
+      source: apps/Yumlog.Native/DesktopLibrary.fs
+      guide: /?section=gallery
+    - id: audio
+      title: Audio
+      glyph: audio
+      section: capture
+      role: audio-extraction
+      summary: Extract a WAV and inspect the recording's frequency structure.
+      inputs: [audioTrack]
+      outputs: [audio, spectrogram]
+      actions: [wave, spectrogram]
+      source: apps/Yumlog.Native/DesktopMedia.fs
+      guide: /docs/NATIVE-CLI.html
+    - id: transcript
+      title: Transcript
+      glyph: text
+      section: evidence
+      role: caption-and-speech-transcription
+      summary: Keep captions and transcription attached to their source time.
+      inputs: [captionFile, subtitleTrack, audioTrack, whisperModel]
+      outputs: [transcript]
+      actions: [attachTranscript, subtitles, transcribe, genAudioTranscribe]
+      source: apps/Yumlog.Native/DesktopLibrary.fs
+      guide: /docs/NATIVE-CLI.html#speak-and-transcribe-gen-audio
+    - id: agents
+      title: Agents
+      glyph: nodes
+      section: protocols
+      role: native-capability-catalog
+      summary: Inspect capabilities and readiness before invoking a tool.
+      inputs: [extensionManifests, windowsAiRuntime, audioTrack]
+      outputs: [catalog, ocrReadiness, agentVoices, agentVoice]
+      actions: [catalog, ocrStatus, loadOcr, detectAgentVoices, agentVoices]
+      source: apps/Yumlog.Native/DesktopLibrary.fs
+      guide: /docs/AGENT-PLUGIN.html
+    - id: voices
+      title: Voices
+      glyph: mic
+      section: reasoning
+      role: recording-speakers-and-narration
+      summary: Review speaker turns and render narration with configured voices.
+      inputs: [audioTrack, installedVoice, script]
+      outputs: [agentVoices, agentVoice, voice]
+      actions: [detectAgentVoices, agentVoices, voices, speak, genAudioSpeak]
+      source: apps/Yumlog.Native/StudioAgentVoices.fs
+      guide: /docs/NATIVE-CLI.html#speak-and-transcribe-gen-audio
+    - id: insights
+      title: Insights
+      glyph: chart
+      section: evidence
+      role: recording-and-frame-analysis
+      summary: Inspect measured media properties and evidence-linked outputs.
+      inputs: [recording, frame, timedMetadata]
+      outputs: [mediaInfo, ocr, runbook]
+      actions: [probe, ocr, runbook, decimate, importAnalysis]
+      source: apps/Yumlog.Native/StudioSemantic.fs
+      guide: /docs/SDK-FRAMEWORK.html#2-read-evidence-from-an-existing-recording
+    - id: bitcube
+      title: bitcube
+      glyph: cube
+      section: widgets
+      role: inverse-hdr-cube
+      summary: Inspect the audio-linked bitcube representation and its layers.
+      inputs: [audioTrack]
+      outputs: [bitcube, audio]
+      actions: [bitcube, wave]
+      source: apps/Yumlog.Native/StudioBitCube.fs
+      guide: https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/Studio/schemas/README.md
+    - id: library
+      title: Library
+      glyph: books
+      section: widgets
+      role: atomic-flipcard-schemas
+      summary: Browse atomic schemas with explicit source and meaning.
+      inputs: [sourceRecording, transcript, documents]
+      outputs: [atomicLibrary, bitdot, schema]
+      actions: [library, decimate, attachDocument, exportArtifact]
+      source: apps/Yumlog.Native/StudioSemantic.fs
+      guide: https://github.com/DarbotLM/yumlog#studio-semantic-library
+    - id: harvest
+      title: Harvest
+      glyph: box
+      section: evidence
+      role: paperboy-delivery
+      summary: Deliver the original recording, derived artifacts and card together.
+      inputs: [recording, derivedArtifacts, paperboyCard]
+      outputs: [cardJson, paperboyBundle]
+      actions: [exportCard, copyCard, copySchema, bundle, openArtifact, exportArtifact]
+      source: apps/Yumlog.Native/DesktopLibrary.fs
+      guide: /docs/SDK-FRAMEWORK.html
+    - id: settings
+      title: Settings
+      glyph: sliders
+      section: install
+      role: local-workspace-configuration
+      summary: Keep output folders and local tool configuration explicit.
+      inputs: [outputDirectory, cardSize, ffmpeg, whisper]
+      outputs: [workspaceSettings]
+      actions: [saveSettings, setSize, openOutput]
+      source: apps/Yumlog.Native/DesktopLibrary.fs
+      guide: https://github.com/DarbotLM/yumlog#using-yumlog-studio

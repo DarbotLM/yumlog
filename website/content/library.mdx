@@ -1,0 +1,46 @@
+## Library: atomic cards, not detached claims
+
+Library presents source-linked atomic cards distilled from recordings,
+transcripts and attached documents. Each card needs a source and a stated
+meaning; a visually polished tile is not evidence of correctness.
+
+### Instructions
+
+1. Run semantic decimation in Insights for the selected source.
+2. Load the resulting atomic library.
+3. Search by schema, tag, field or phrase; filter by modality when comparing
+   video, audio and document evidence.
+4. Flip an atomic card to inspect its JSON, provenance and source range.
+5. Export only after reviewing unknown attributes and missing sources.
+
+### Example workflow
+
+Attach a supporting document to a recording, run decimation, and find the
+cards describing the relevant step. Resolve the frame or transcript time
+before using the card in an agent answer. Keep a document citation as a
+document citation rather than pretending it came from audio.
+
+### Tools and artifacts
+
+| Action | Purpose |
+|---|---|
+| `library` | Load existing atomic cards |
+| `decimate` | Create source-linked semantic outputs |
+| `attachDocument` | Associate an approved supporting document |
+| `exportArtifact` | Export the selected artifact |
+
+Outputs may include `atomicLibrary`, `bitdot` and `schema`. Source paths and
+filenames can themselves be sensitive.
+
+### Agents, SDK and Paperboy
+
+Validate against the card's declared schema and preserve its version. Do
+not change contract identifiers merely because a repository URL changed.
+AgentCard 3.1, Paperboy video cards and atomic library cards have different
+contracts; an adapter must map them explicitly.
+
+Read [SDK and evidence integration](/yumlog/docs/SDK-FRAMEWORK/),
+[AgentCard 3.1 source provenance](https://github.com/DarbotLM/yumlog/blob/main/config/agentcards/ac3.1/SOURCE.md),
+and [semantic library source](https://github.com/DarbotLM/yumlog/blob/main/apps/Yumlog.Native/StudioSemantic.fs).
+Continue with [Insights](/yumlog/?section=insights&face=wiki) or
+[Harvest](/yumlog/?section=harvest&face=wiki).
