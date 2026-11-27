@@ -1,0 +1,95 @@
+import React, {useEffect, useRef, useState} from 'react';
+import {useLocation} from '@docusaurus/router';
+
+const gap = 28;
+
+export default function CardLayers({children, title}) {
+  const viewport = useRef(null);
+  const flow = useRef(null);
+  const {hash} = useLocation();
+  const [layout, setLayout] = useState({width: 0, height: 0, labels: [title]});
+  const [layer, setLayer] = useState(0);
+  const stride = layout.width + gap;
+
+  useEffect(() => {
+    let frame;
+    let disposed = false;
+    const measure = () => {
+      if (disposed) return;
+      const width = viewport.current.clientWidth;
+      const height = viewport.current.clientHeight;
+      if (!width || !height) return;
+      flow.current.style.width = `${width}px`;
+      flow.current.style.height = `${height}px`;
+      flow.current.style.columnWidth = `${width}px`;
+      const count = Math.max(1, Math.ceil((flow.current.scrollWidth + gap - 1) / (width + gap)));
+      const origin = flow.current.getBoundingClientRect().left;
+      const headings = [...flow.current.querySelectorAll('h2,h3,h4')].map(heading => ({
+        text: heading.textContent,
+        layer: Math.max(0, Math.floor((heading.getBoundingClientRect().left - origin + 1) / (width + gap))),
+      }));
+      let previous = title;
+      const labels = Array.from({length: count}, (_, index) => {
+        const heading = headings.find(item => item.layer === index);
+        if (heading) previous = heading.text;
+        return heading || index === 0 ? previous : `${previous} (continued)`;
+      });
+      setLayout({width, height, labels});
+      setLayer(current => Math.min(current, count - 1));
+    };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    };
+    const resize = new ResizeObserver(schedule);
+    resize.observe(viewport.current);
+    const content = new MutationObserver(schedule);
+    content.observe(flow.current, {subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['open']});
+    document.fonts?.ready.then(schedule);
+    schedule();
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(frame);
+      resize.disconnect();
+      content.disconnect();
+    };
+  }, [title]);
+
+  useEffect(() => {
+    if (!hash || !layout.width) return;
+    let id;
+    try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
+    const target = document.getElementById(id);
+    if (!target || !flow.current.contains(target)) return;
+    const offset = target.getBoundingClientRect().left - flow.current.getBoundingClientRect().left;
+    setLayer(Math.max(0, Math.min(layout.labels.length - 1, Math.floor((offset + 1) / stride))));
+  }, [hash, layout.width, layout.height, layout.labels.length, stride]);
+
+  const revealFocus = event => {
+    const origin = flow.current.getBoundingClientRect().left;
+    const rects = [...event.target.getClientRects()];
+    if (!rects.length || !layout.width) return;
+    const pages = rects.map(rect => Math.floor((rect.left - origin + 1) / stride));
+    if (!pages.includes(layer)) setLayer(Math.max(0, Math.min(layout.labels.length - 1, pages[0])));
+  };
+  const change = next => setLayer(Math.max(0, Math.min(layout.labels.length - 1, next)));
+
+  return <div className="card-layers" data-layer={layer + 1} data-layer-count={layout.labels.length}>
+    <div className="layer-window" ref={viewport}>
+      <div className="layer-flow" ref={flow} onFocusCapture={revealFocus}
+        style={{columnGap: `${gap}px`, transform: `translateX(${-layer * stride}px)`}}>
+        {children}
+      </div>
+    </div>
+    <nav className="layer-controls" aria-label={`${title} layers`}>
+      <button type="button" disabled={layer === 0} onClick={() => change(layer - 1)}>Previous</button>
+      <label className="layer-select"><span className="sr-only">Agent Card layer</span>
+        <select value={layer} onChange={event => change(Number(event.target.value))}>
+          {layout.labels.map((label, index) => <option key={index} value={index}>{index + 1}. {label}</option>)}
+        </select>
+      </label>
+      <span className="layer-position" role="status" aria-live="polite">{layer + 1} / {layout.labels.length}</span>
+      <button type="button" disabled={layer === layout.labels.length - 1} onClick={() => change(layer + 1)}>Next</button>
+    </nav>
+  </div>;
+}

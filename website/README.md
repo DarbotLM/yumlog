@@ -70,6 +70,16 @@ to Wide; an explicit selection persists only in the current browser session
 and does not change native Studio settings. Wide mode uses half the normal
 top spacing above the card at each breakpoint.
 
+Wiki cards fit the available viewport. Their content flows into measured
+Agent Card layers, navigated with Previous, Next, or the layer selector.
+Text, lists, tables and code continue across layers rather than being
+truncated; original links and code-copy controls remain live. Resizing or
+changing Agent Card Size recalculates the layers. Heading links and keyboard
+focus reveal their corresponding layer. Printing includes the complete text.
+Short or narrow viewports replace the full section dock with compact section
+and developer-guide selectors. Product pages and standalone developer guides
+retain their normal document layout.
+
 Product screenshots must be supplied and approved for publication. Do not
 substitute annotated website screenshots or fabricated media for native app
 captures. Use an isolated browser context for viewport QA; do not resize the

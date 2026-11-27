@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useRef} from 'react';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import useBaseUrl from '@docusaurus/useBaseUrl';
@@ -9,6 +9,7 @@ import MDXComponents from '@theme/MDXComponents';
 import Glyph from './StudioGlyph';
 import {useWikiPreferences} from './WikiPreferences';
 import {useRelease} from './release';
+import CardLayers from './CardLayers';
 import Video from '../../content/video.mdx';
 import Screenshot from '../../content/screenshot.mdx';
 import Audio from '../../content/audio.mdx';
@@ -33,7 +34,6 @@ export default function StudioWiki({section}) {
   const release = useRelease();
   const search = new URLSearchParams(location.search);
   const face = ['tool', 'paperboy'].includes(search.get('face')) ? search.get('face') : 'wiki';
-  const [dockOpen, setDockOpen] = useState(false);
   const pageTitle = useRef(null);
   const root = useBaseUrl('/wiki/');
   const docBase = useBaseUrl('/docs/');
@@ -56,7 +56,6 @@ export default function StudioWiki({section}) {
   }, [history, root, section?.id, location.search, location.hash]);
 
   const navigate = (id, nextFace = 'wiki', focus = true) => {
-    setDockOpen(false);
     history.push(`${root}${id}/${nextFace === 'wiki' ? '' : `?face=${nextFace}`}`);
     if (focus) requestAnimationFrame(() => pageTitle.current?.focus({preventScroll: true}));
   };
@@ -74,19 +73,31 @@ export default function StudioWiki({section}) {
   return <Layout title={`${current.title} wiki deck`} description={current.summary}
     wrapperClassName="studio-wiki-page">
     <div className="studio-wiki-shell" data-size={size}>
-      <aside className="wiki-dock" aria-label="Studio wiki sections" data-open={dockOpen}>
-        <button className="dock-toggle" type="button" aria-expanded={dockOpen}
-          aria-controls="wiki-dock-contents" onClick={() => setDockOpen(!dockOpen)}>Browse Studio sections</button>
+      <aside className="wiki-dock" aria-label="Studio wiki sections">
+        <div className="dock-compact-controls">
+          <label><span className="sr-only">Wiki section</span>
+            <select value={current.id} onChange={event => navigate(event.target.value)}>
+              {model.assets.map(asset => <option key={asset.id} value={asset.id}>{asset.title}</option>)}
+            </select>
+          </label>
+          <label><span className="sr-only">Developer guide</span>
+            <select value="" onChange={event => history.push(`${docBase}${event.target.value}/`)}>
+              <option value="" disabled>Developer guides</option>
+              <option value="SDK-FRAMEWORK">SDK &amp; framework</option>
+              <option value="AGENT-PLUGIN">Agent Plugin &amp; MCP</option>
+              <option value="NATIVE-CLI">Native CLI reference</option>
+            </select>
+          </label>
+        </div>
         <div id="wiki-dock-contents" className="dock-contents">
           <nav aria-label="Choose a Studio wiki">
             {model.assets.map(asset => <a key={asset.id} href={sectionHref(asset.id)}
               aria-current={current.id === asset.id ? 'page' : undefined}
               onClick={e => follow(e, asset.id)}>
               <Glyph name={asset.glyph}/><span>{asset.title}</span>
-              <span className="dock-count">{String(model.assets.indexOf(asset) + 1).padStart(2, '0')}</span>
             </a>)}
           </nav>
-          <div className="dock-guides"><span className="dock-label">DEVELOPER GUIDES</span>
+          <div className="dock-guides">
             <Link to={`${docBase}SDK-FRAMEWORK`}>SDK &amp; framework</Link>
             <Link to={`${docBase}AGENT-PLUGIN`}>Agent Plugin &amp; MCP</Link>
             <Link to={`${docBase}NATIVE-CLI`}>Native CLI reference</Link>
@@ -108,11 +119,11 @@ export default function StudioWiki({section}) {
             </div>
           </header>
           <section id="wiki-card-content" className="wiki-face" aria-label={`${current.title} ${face === 'wiki' ? 'wiki deck' : face === 'paperboy' ? 'Paperboy details' : 'tool overview'}`}>
+            <CardLayers key={`${current.id}-${face}`} title={current.title}>
             {face === 'wiki' && <div className="wiki-article markdown">
               <MDXProvider components={MDXComponents}><Article/></MDXProvider>
             </div>}
             {face === 'tool' && <div className="wiki-overview">
-              <div className="overview-symbol"><Glyph name={current.glyph}/><span>{current.role}</span></div>
               <h3>{current.summary}</h3>
               <p>This is the capability front of the {current.title} card. The native app performs these operations; this website explains them.</p>
               <div className="contract-grid">{[['Inputs', current.inputs], ['Outputs', current.outputs], ['Actions', current.actions]].map(([label, items]) =>
@@ -120,7 +131,6 @@ export default function StudioWiki({section}) {
               <button className="wiki-primary" type="button" onClick={() => navigate(current.id)}>Flip to Wiki deck</button>
             </div>}
             {face === 'paperboy' && <div className="wiki-overview">
-              <div className="wiki-face-label">BACK OF CARD / PAPERBOY DETAILS</div>
               <h3>{current.title} contract</h3>
               <p>Inspect the source-linked descriptor, then open the Wiki deck for instructions. This is not a fabricated capture, analysis, or delivery receipt.</p>
               <dl className="contract-fields"><dt>Role</dt><dd>{current.role}</dd>
@@ -131,14 +141,9 @@ export default function StudioWiki({section}) {
               <p><a href={model.sourceBase + current.source}>Read the implementation</a></p>
               <button className="wiki-primary" type="button" onClick={() => navigate(current.id)}>Open Wiki deck</button>
             </div>}
+            </CardLayers>
           </section>
-          <nav className="wiki-bottom-tabs" aria-label="Studio card sections">
-            {model.assets.map(asset => <a key={asset.id} href={sectionHref(asset.id)} onClick={e => follow(e, asset.id)}
-              aria-current={current.id === asset.id ? 'page' : undefined}><Glyph name={asset.glyph}/><span>{asset.title}</span></a>)}
-          </nav>
         </article>
-        <footer className="wiki-workspace-footer"><span role="status">{current.title} / {face === 'wiki' ? 'Wiki deck' : face === 'paperboy' ? 'Paperboy details' : 'Tool view'}</span>
-          <span>Documentation, not live telemetry</span></footer>
       </main>
     </div>
   </Layout>;
