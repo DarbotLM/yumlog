@@ -27,6 +27,7 @@ export default function WikiSidebar({assets, sections, currentId, activeHeading,
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
+      if (!panel.current) return;
       const row = panel.current.querySelector(`[data-card="${currentId}"]`);
       if (!row || !panel.current.clientHeight) return;
       const bounds = panel.current.getBoundingClientRect();
@@ -40,7 +41,7 @@ export default function WikiSidebar({assets, sections, currentId, activeHeading,
 
   useEffect(() => {
     if (!open) return undefined;
-    const dismiss = event => { if (!aside.current.contains(event.target)) setOpen(false); };
+    const dismiss = event => { if (aside.current && !aside.current.contains(event.target)) setOpen(false); };
     document.addEventListener('pointerdown', dismiss);
     return () => document.removeEventListener('pointerdown', dismiss);
   }, [open]);

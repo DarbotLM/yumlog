@@ -15,7 +15,7 @@ export default function ContentPages({children, title}) {
     let frame;
     let disposed = false;
     const measure = () => {
-      if (disposed) return;
+      if (disposed || !viewport.current || !flow.current) return;
       const width = viewport.current.clientWidth;
       const height = viewport.current.clientHeight;
       if (!width || !height) return;
@@ -61,7 +61,7 @@ export default function ContentPages({children, title}) {
   }, [title]);
 
   useEffect(() => {
-    if (!hash || !layout.width) return;
+    if (!hash || !layout.width || !flow.current) return;
     let id;
     try { id = decodeURIComponent(hash.slice(1)); } catch { return; }
     const target = document.getElementById(id);
@@ -71,6 +71,7 @@ export default function ContentPages({children, title}) {
   }, [hash, locationKey, layout.width, layout.height, layout.labels.length, stride]);
 
   const revealFocus = event => {
+    if (!flow.current) return;
     const origin = flow.current.getBoundingClientRect().left;
     const rects = Array.from(event.target.getClientRects());
     if (!rects.length || !layout.width) return;

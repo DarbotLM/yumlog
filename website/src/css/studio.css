@@ -195,7 +195,7 @@ body:has(.studio-wiki-shell) .footer { display: none; }
   .layer-controls { padding: 4px 8px; }
 }
 @media print {
-  .navbar,.wiki-dock,.face-controls,.footer,.layer-controls { display: none; }
+  .navbar,.wiki-dock,.face-controls,.semantic-layer-controls,.card-back-tabs,.footer,.layer-controls { display: none; }
   body:has(.studio-wiki-shell) { overflow: visible; }
   .studio-wiki-shell,.wiki-workspace,.wiki-card,.wiki-face,.card-layers,.layer-window { display: block; height: auto; overflow: visible; }
   .layer-flow { height: auto !important; columns: auto !important; transform: none !important; }
