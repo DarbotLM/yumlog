@@ -80,6 +80,13 @@ Short or narrow viewports replace the full section dock with compact section
 and developer-guide selectors. Product pages and standalone developer guides
 retain their normal document layout.
 
+The selected card automatically expands its named headings in the wiki
+sidebar. Heading links reveal their containing layer, including the dynamic
+release/install sections. Expand all stays expanded when switching cards;
+Collapse all and individual toggles are also available. Only the sidebar
+scrolls when expanded content exceeds its height. Compact layouts expose the
+same accordion through the Sections button without moving the Agent Card.
+
 Product screenshots must be supplied and approved for publication. Do not
 substitute annotated website screenshots or fabricated media for native app
 captures. Use an isolated browser context for viewport QA; do not resize the

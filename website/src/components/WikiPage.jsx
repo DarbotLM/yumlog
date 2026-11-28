@@ -1,6 +1,5 @@
-import React, {useEffect, useRef} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import Layout from '@theme/Layout';
-import Link from '@docusaurus/Link';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import {useHistory, useLocation} from '@docusaurus/router';
@@ -8,35 +7,42 @@ import {MDXProvider} from '@mdx-js/react';
 import MDXComponents from '@theme/MDXComponents';
 import Glyph from './StudioGlyph';
 import {useWikiPreferences} from './WikiPreferences';
-import {useRelease} from './release';
 import CardLayers from './CardLayers';
-import Video from '../../content/video.mdx';
-import Screenshot from '../../content/screenshot.mdx';
-import Audio from '../../content/audio.mdx';
-import Transcript from '../../content/transcript.mdx';
-import Agents from '../../content/agents.mdx';
-import Voices from '../../content/voices.mdx';
-import Insights from '../../content/insights.mdx';
-import Bitcube from '../../content/bitcube.mdx';
-import Library from '../../content/library.mdx';
-import Harvest from '../../content/harvest.mdx';
-import Settings from '../../content/settings.mdx';
+import WikiSidebar from './WikiSidebar';
+import {releaseSections} from './ReleaseInstall';
+import Video, {toc as videoSections} from '../../content/video.mdx';
+import Screenshot, {toc as screenshotSections} from '../../content/screenshot.mdx';
+import Audio, {toc as audioSections} from '../../content/audio.mdx';
+import Transcript, {toc as transcriptSections} from '../../content/transcript.mdx';
+import Agents, {toc as agentsSections} from '../../content/agents.mdx';
+import Voices, {toc as voicesSections} from '../../content/voices.mdx';
+import Insights, {toc as insightsSections} from '../../content/insights.mdx';
+import Bitcube, {toc as bitcubeSections} from '../../content/bitcube.mdx';
+import Library, {toc as librarySections} from '../../content/library.mdx';
+import Harvest, {toc as harvestSections} from '../../content/harvest.mdx';
+import Settings, {toc as settingsSections} from '../../content/settings.mdx';
 
 const articles = {video: Video, screenshot: Screenshot, audio: Audio, transcript: Transcript,
   agents: Agents, voices: Voices, insights: Insights, bitcube: Bitcube, library: Library,
   harvest: Harvest, settings: Settings};
+const sections = {
+  video: videoSections, screenshot: screenshotSections, audio: audioSections,
+  transcript: transcriptSections, agents: agentsSections, voices: voicesSections,
+  insights: insightsSections, bitcube: bitcubeSections, library: librarySections,
+  harvest: harvestSections,
+  settings: [settingsSections[0], ...releaseSections, ...settingsSections.slice(1)],
+};
 export default function StudioWiki({section}) {
   const {siteConfig} = useDocusaurusContext();
   const history = useHistory();
   const location = useLocation();
   const model = siteConfig.customFields.studio;
   const {size} = useWikiPreferences();
-  const release = useRelease();
+  const [activeHeading, setActiveHeading] = useState(null);
   const search = new URLSearchParams(location.search);
   const face = ['tool', 'paperboy'].includes(search.get('face')) ? search.get('face') : 'wiki';
   const pageTitle = useRef(null);
   const root = useBaseUrl('/wiki/');
-  const docBase = useBaseUrl('/docs/');
   const current = model.assets.find(a => a.id === section?.id) || model.assets[0];
   const Article = articles[current.id];
   useEffect(() => {
@@ -55,14 +61,9 @@ export default function StudioWiki({section}) {
     }
   }, [history, root, section?.id, location.search, location.hash]);
 
-  const navigate = (id, nextFace = 'wiki', focus = true) => {
-    history.push(`${root}${id}/${nextFace === 'wiki' ? '' : `?face=${nextFace}`}`);
+  const navigate = (id, nextFace = 'wiki', focus = true, anchor) => {
+    history.push(`${root}${id}/${nextFace === 'wiki' ? '' : `?face=${nextFace}`}${anchor ? `#${encodeURIComponent(anchor)}` : ''}`);
     if (focus) requestAnimationFrame(() => pageTitle.current?.focus({preventScroll: true}));
-  };
-  const sectionHref = id => `${root}${id}/`;
-  const follow = (event, id) => {
-    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-    event.preventDefault(); navigate(id);
   };
   const contract = {
     schema: model.schema, id: `yumlog.ui.${current.id}`, title: current.title,
@@ -73,38 +74,9 @@ export default function StudioWiki({section}) {
   return <Layout title={`${current.title} wiki deck`} description={current.summary}
     wrapperClassName="studio-wiki-page">
     <div className="studio-wiki-shell" data-size={size}>
-      <aside className="wiki-dock" aria-label="Studio wiki sections">
-        <div className="dock-compact-controls">
-          <label><span className="sr-only">Wiki section</span>
-            <select value={current.id} onChange={event => navigate(event.target.value)}>
-              {model.assets.map(asset => <option key={asset.id} value={asset.id}>{asset.title}</option>)}
-            </select>
-          </label>
-          <label><span className="sr-only">Developer guide</span>
-            <select value="" onChange={event => history.push(`${docBase}${event.target.value}/`)}>
-              <option value="" disabled>Developer guides</option>
-              <option value="SDK-FRAMEWORK">SDK &amp; framework</option>
-              <option value="AGENT-PLUGIN">Agent Plugin &amp; MCP</option>
-              <option value="NATIVE-CLI">Native CLI reference</option>
-            </select>
-          </label>
-        </div>
-        <div id="wiki-dock-contents" className="dock-contents">
-          <nav aria-label="Choose a Studio wiki">
-            {model.assets.map(asset => <a key={asset.id} href={sectionHref(asset.id)}
-              aria-current={current.id === asset.id ? 'page' : undefined}
-              onClick={e => follow(e, asset.id)}>
-              <Glyph name={asset.glyph}/><span>{asset.title}</span>
-            </a>)}
-          </nav>
-          <div className="dock-guides">
-            <Link to={`${docBase}SDK-FRAMEWORK`}>SDK &amp; framework</Link>
-            <Link to={`${docBase}AGENT-PLUGIN`}>Agent Plugin &amp; MCP</Link>
-            <Link to={`${docBase}NATIVE-CLI`}>Native CLI reference</Link>
-          </div>
-          <a className="install-studio" href={sectionHref('settings')} onClick={e => follow(e, 'settings')}>Install Yumlog {release.version}</a>
-        </div>
-      </aside>
+      <WikiSidebar assets={model.assets} sections={sections} currentId={current.id}
+        activeHeading={face === 'wiki' ? activeHeading : null}
+        onNavigate={(id, anchor) => navigate(id, 'wiki', true, anchor)}/>
       <main className="wiki-workspace" id="wiki-workspace">
         <article className="wiki-card" aria-label={`${current.title} Studio card`} data-face={face}>
           <header className="wiki-card-header">
@@ -119,7 +91,7 @@ export default function StudioWiki({section}) {
             </div>
           </header>
           <section id="wiki-card-content" className="wiki-face" aria-label={`${current.title} ${face === 'wiki' ? 'wiki deck' : face === 'paperboy' ? 'Paperboy details' : 'tool overview'}`}>
-            <CardLayers key={`${current.id}-${face}`} title={current.title}>
+            <CardLayers key={`${current.id}-${face}`} title={current.title} onLayerChange={setActiveHeading}>
             {face === 'wiki' && <div className="wiki-article markdown">
               <MDXProvider components={MDXComponents}><Article/></MDXProvider>
             </div>}

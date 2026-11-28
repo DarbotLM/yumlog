@@ -5,6 +5,7 @@ const sizes = ['compact', 'studio', 'wide'];
 
 export function WikiPreferences({children}) {
   const [size, setSize] = useState('wide');
+  const [navigation, setNavigation] = useState({mode: 'selected', cards: []});
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem('yumlog.wiki.cardSize');
@@ -16,7 +17,7 @@ export function WikiPreferences({children}) {
     setSize(value);
     try { sessionStorage.setItem('yumlog.wiki.cardSize', value); } catch {}
   };
-  return <Preferences.Provider value={{size, setSize: changeSize}}>{children}</Preferences.Provider>;
+  return <Preferences.Provider value={{size, setSize: changeSize, navigation, setNavigation}}>{children}</Preferences.Provider>;
 }
 
 export const useWikiPreferences = () => useContext(Preferences);

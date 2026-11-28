@@ -3,11 +3,11 @@ import {useLocation} from '@docusaurus/router';
 
 const gap = 28;
 
-export default function CardLayers({children, title}) {
+export default function CardLayers({children, title, onLayerChange}) {
   const viewport = useRef(null);
   const flow = useRef(null);
-  const {hash} = useLocation();
-  const [layout, setLayout] = useState({width: 0, height: 0, labels: [title]});
+  const {hash, key: locationKey} = useLocation();
+  const [layout, setLayout] = useState({width: 0, height: 0, labels: [title], headings: []});
   const [layer, setLayer] = useState(0);
   const stride = layout.width + gap;
 
@@ -25,6 +25,7 @@ export default function CardLayers({children, title}) {
       const origin = flow.current.getBoundingClientRect().left;
       const headings = Array.from(flow.current.querySelectorAll('h2,h3,h4')).map(heading => ({
         text: heading.textContent,
+        id: heading.id,
         layer: Math.max(0, Math.floor((heading.getBoundingClientRect().left - origin + 1) / (width + gap))),
       }));
       const count = Math.max(1, Math.ceil((flow.current.scrollWidth + gap - 1) / (width + gap)),
@@ -35,7 +36,7 @@ export default function CardLayers({children, title}) {
         if (heading) previous = heading.text;
         return heading || index === 0 ? previous : `${previous} (continued)`;
       });
-      setLayout({width, height, labels});
+      setLayout({width, height, labels, headings});
       setLayer(current => Math.min(current, count - 1));
     };
     const schedule = () => {
@@ -67,7 +68,16 @@ export default function CardLayers({children, title}) {
     if (!target || !flow.current.contains(target)) return;
     const offset = target.getBoundingClientRect().left - flow.current.getBoundingClientRect().left;
     setLayer(Math.max(0, Math.min(layout.labels.length - 1, Math.floor((offset + 1) / stride))));
-  }, [hash, layout.width, layout.height, layout.labels.length, stride]);
+  }, [hash, locationKey, layout.width, layout.height, layout.labels.length, stride]);
+
+  useEffect(() => {
+    let anchor;
+    try { anchor = decodeURIComponent(hash.slice(1)); } catch { anchor = ''; }
+    const heading = layout.headings.find(item => item.layer === layer && item.id === anchor) ||
+      layout.headings.find(item => item.layer === layer) ||
+      layout.headings.filter(item => item.layer < layer).at(-1);
+    onLayerChange?.(heading?.id || null);
+  }, [layer, layout.headings, hash, onLayerChange]);
 
   const revealFocus = event => {
     const origin = flow.current.getBoundingClientRect().left;

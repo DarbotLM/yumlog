@@ -41,6 +41,19 @@ body:has(.studio-wiki-shell) .footer { display: none; }
 .studio-wiki-page { min-height: 0; }
 .studio-wiki-shell { display: grid; grid-template-columns: 244px minmax(0,1fr); height: calc(100dvh - var(--ifm-navbar-height)); min-height: 0; overflow: clip; }
 .wiki-dock { min-height: 0; background: var(--studio-sidebar); border-right: 1px solid var(--studio-line); padding: 18px 14px; }
+.dock-contents { height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.dock-expansion-controls { position: sticky; top: 0; z-index: 1; display: flex; gap: 6px; padding: 0 0 10px; background: var(--studio-sidebar); }
+.dock-expansion-controls button,.wiki-tree-toggle,.dock-sections-toggle { background: var(--studio-pane); color: var(--studio-text); border: 1px solid var(--studio-line); border-radius: 7px; font-size: 11px; padding: 6px 8px; cursor: pointer; }
+.dock-expansion-controls button { flex: 1; }
+.dock-expansion-controls button:disabled { opacity: .45; cursor: default; }
+.wiki-tree-row { display: flex; align-items: center; gap: 4px; }
+.wiki-tree-row .wiki-card-link { flex: 1; min-width: 0; }
+.wiki-tree-toggle { flex: none; padding: 5px; min-width: 28px; min-height: 32px; }
+.wiki-tree-toggle svg { display: block; }
+.wiki-tree-toggle[aria-expanded='true'] svg { transform: rotate(90deg); }
+.wiki-subsections { list-style: none; padding: 3px 0 7px 22px; margin: 0; }
+.wiki-dock nav .wiki-subsections a { min-height: 28px; padding: 5px 8px; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.wiki-dock nav .wiki-subsections a[aria-current='location'] { color: var(--studio-accent); background: var(--studio-selected); }
 .wiki-dock nav { display: grid; gap: 4px; }
 .wiki-dock nav a { display: flex; align-items: center; gap: 12px; min-height: 39px; padding: 8px 10px; color: var(--studio-muted); border: 1px solid var(--studio-clear); border-radius: 8px; font-size: 13px; text-decoration: none; }
 .wiki-dock nav a:hover { background: var(--studio-pane); color: var(--studio-text); }
@@ -136,8 +149,9 @@ body:has(.studio-wiki-shell) .footer { display: none; }
 }
 @media (max-width: 720px), (max-height: 800px) {
   .studio-wiki-shell { grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(0,1fr); }
-  .wiki-dock { border-right: 0; border-bottom: 1px solid var(--studio-line); padding: 6px 14px; }
+  .wiki-dock { position: relative; border-right: 0; border-bottom: 1px solid var(--studio-line); padding: 6px 14px; z-index: 2; }
   .dock-contents { display: none; }
+  .wiki-dock[data-open='true'] .dock-contents { display: block; position: absolute; left: 0; top: 100%; width: min(390px,100%); height: auto; max-height: calc(100dvh - var(--ifm-navbar-height) - 64px); padding: 12px 14px; background: var(--studio-sidebar); border: 1px solid var(--studio-line); border-radius: 0 0 12px 12px; }
   .dock-compact-controls { display: flex; gap: 10px; }
   .dock-compact-controls label { flex: 1; min-width: 0; }
   .dock-compact-controls select { width: 100%; }
