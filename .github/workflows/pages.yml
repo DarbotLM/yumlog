@@ -8,6 +8,7 @@ on:
       - 'docs/**'
       - '_config.yml'
       - 'apps/Yumlog.Native/Studio/branding/**'
+      - 'config/agentcards/ac3.1/**'
       - '.github/workflows/pages.yml'
   pull_request:
     paths:
@@ -15,6 +16,7 @@ on:
       - 'docs/**'
       - '_config.yml'
       - 'apps/Yumlog.Native/Studio/branding/**'
+      - 'config/agentcards/ac3.1/**'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
   release:
@@ -40,6 +42,7 @@ jobs:
           ref: ${{ github.event_name == 'release' && 'main' || github.ref }}
           persist-credentials: false
           lfs: false
+          fetch-depth: 50
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: '24'

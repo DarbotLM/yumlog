@@ -27,7 +27,7 @@ export default function Website() {
   const [selected, setSelected] = useState('video');
   const assets = siteConfig.customFields.studio.assets;
   const current = assets.find(asset => asset.id === selected);
-  const guide = id => `${wiki}${id}/`;
+  const guide = (id, layer = 'title') => `${wiki}${id}/${layer}/`;
 
   useEffect(() => {
     const query = new URLSearchParams(location.search);
@@ -125,6 +125,7 @@ export default function Website() {
           <h2 id="developers-title">Tools for people. Contracts for agents.</h2>
           <p>Use the native CLI, versioned schemas and explicit protocol boundaries.
             Discovery is not permission, and a declaration is not an executable backend.</p></div>
+        <p><a href={`${wiki.replace(/wiki\/$/, '')}cards/index.json`}>Browse the machine-readable catalog of 66 documentation flipcards</a>.</p>
         <div className="product-developer-grid">
           <Link to="/docs/NATIVE-CLI/"><span className="product-number">CLI</span><h3>Automate the workflow</h3>
             <p>Recording, analysis, transcription and cited runbooks with explicit inputs and outputs.</p><span>Native CLI reference</span></Link>
@@ -153,7 +154,7 @@ export default function Website() {
               signature and publisher before installing. Separate suite executables are not included.</p>
             <p className="product-caption">MSIX / {assetSize(currentRelease.msix)} / version {currentRelease.msixVersion}</p>
             <a className="product-button" href={currentRelease.msix.url}>Download Native Studio</a>
-            <div className="product-download-meta"><Link to={guide('settings')}>Installation instructions</Link>
+            <div className="product-download-meta"><Link to={guide('settings', 'instructions')}>Installation instructions</Link>
               <a href={currentRelease.url}>Release notes</a></div></article>
         </div>
         <p className="product-download-note">Release metadata checked at build time on {currentRelease.checkedAt.slice(0, 10)}.

@@ -53,11 +53,11 @@ body:has(.studio-wiki-shell) .footer { display: none; }
 .wiki-tree-toggle[aria-expanded='true'] svg { transform: rotate(90deg); }
 .wiki-subsections { list-style: none; padding: 3px 0 7px 22px; margin: 0; }
 .wiki-dock nav .wiki-subsections a { min-height: 28px; padding: 5px 8px; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
-.wiki-dock nav .wiki-subsections a[aria-current='location'] { color: var(--studio-accent); background: var(--studio-selected); }
+.wiki-dock nav .wiki-subsections a[aria-current='page'] { color: var(--studio-accent); background: var(--studio-selected); }
 .wiki-dock nav { display: grid; gap: 4px; }
 .wiki-dock nav a { display: flex; align-items: center; gap: 12px; min-height: 39px; padding: 8px 10px; color: var(--studio-muted); border: 1px solid var(--studio-clear); border-radius: 8px; font-size: 13px; text-decoration: none; }
 .wiki-dock nav a:hover { background: var(--studio-pane); color: var(--studio-text); }
-.wiki-dock nav a[aria-current='page'] { color: var(--studio-accent); background: var(--studio-selected); border-color: var(--studio-accent); }
+.wiki-dock nav .wiki-card-link[data-current='true'] { color: var(--studio-accent); background: var(--studio-selected); border-color: var(--studio-accent); }
 .wiki-glyph { width: 20px; height: 20px; flex: none; }
 .dock-guides { border-top: 1px solid var(--studio-line); margin-top: 20px; padding-top: 16px; display: grid; gap: 7px; font-size: 12px; }
 .install-studio { display: block; text-align: center; background: var(--studio-accent); color: var(--studio-canvas); border: 1px solid var(--studio-accent); border-radius: 8px; padding: 9px; margin-top: 20px; font-size: 12px; font-weight: 650; }
@@ -86,6 +86,16 @@ body:has(.studio-wiki-shell) .footer { display: none; }
 .wiki-card-name .wiki-glyph { color: var(--studio-accent); }
 .wiki-card-name h1 { font-size: 16px; margin: 0; }
 .face-controls { display: flex; gap: 5px; flex-wrap: wrap; }
+.semantic-layer-controls { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.semantic-layer-controls label { min-width: 0; margin: 0; }
+.semantic-layer-controls button,.semantic-layer-controls select,.card-back-tabs button { background: var(--studio-pane); color: var(--studio-text); border: 1px solid var(--studio-line); border-radius: 7px; font-size: 12px; min-height: 34px; padding: 6px 10px; cursor: pointer; }
+.semantic-layer-controls select { max-width: 220px; width: 100%; }
+.semantic-layer-controls button:disabled { opacity: .45; cursor: default; }
+.card-back-tabs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 8px 14px; background: var(--studio-card); border-bottom: 1px solid var(--studio-line); }
+.card-back-tabs button[aria-pressed='true'] { background: var(--studio-selected); border-color: var(--studio-accent); color: var(--studio-accent); }
+.card-back-tabs a { margin-left: auto; font-size: 12px; }
+.card-download-links { display: flex; gap: 12px; margin-left: auto; }
+.card-download-links a { margin: 0; }
 .face-controls button,.wiki-primary { border: 1px solid var(--studio-line); border-radius: 8px; background: var(--studio-pane); color: var(--studio-text); padding: 8px 11px; min-height: 36px; font-size: 12px; cursor: pointer; }
 .face-controls button[aria-pressed='true'] { color: var(--studio-accent); border-color: var(--studio-accent); background: var(--studio-selected); }
 .wiki-primary { margin-top: 12px; background: var(--studio-accent); color: var(--studio-canvas); }
@@ -157,15 +167,33 @@ body:has(.studio-wiki-shell) .footer { display: none; }
   .dock-compact-controls select { width: 100%; }
 }
 @media (max-width: 720px) {
+  .semantic-layer-controls { order: 3; width: 100%; }
+  .semantic-layer-controls label { flex: 1; }
+  .semantic-layer-controls button { font-size: 10px; padding: 5px 7px; }
+  .semantic-layer-controls select { max-width: none; font-size: 11px; }
+  .card-back-tabs { padding: 6px 10px; }
+  .card-back-tabs button { flex: 1; font-size: 10px; padding: 5px; }
+  .card-back-tabs a { flex-basis: 100%; text-align: right; font-size: 10px; }
+  .card-back-tabs .card-download-links { flex-basis: 100%; justify-content: flex-end; }
+  .card-back-tabs .card-download-links a { flex-basis: auto; }
   .layer-window { margin: 12px 16px; }
   .layer-controls { padding: 6px 8px; gap: 5px; }
   .wiki-card-header { padding: 12px; }
-  .face-controls { width: 100%; }
+  .face-controls { margin-left: auto; }
   .face-controls button { flex: 1; font-size: 11px; padding: 7px; }
   .contract-grid { grid-template-columns: 1fr; }
   .navbar__brand { font-size: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; transition: none !important; } }
+@media (max-height: 500px) {
+  .wiki-workspace,[data-size='wide'] .wiki-workspace { padding: 6px 12px; }
+  .wiki-card-header { min-height: 42px; padding: 5px 10px; gap: 6px; }
+  .semantic-layer-controls button,.semantic-layer-controls select,.face-controls button { min-height: 28px; padding: 4px 6px; font-size: 11px; }
+  .card-back-tabs { padding: 4px 8px; }
+  .card-back-tabs button { min-height: 28px; padding: 4px 6px; font-size: 11px; }
+  .layer-window { margin: 6px 12px; }
+  .layer-controls { padding: 4px 8px; }
+}
 @media print {
   .navbar,.wiki-dock,.face-controls,.footer,.layer-controls { display: none; }
   body:has(.studio-wiki-shell) { overflow: visible; }

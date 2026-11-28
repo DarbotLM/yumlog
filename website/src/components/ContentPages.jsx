@@ -3,7 +3,7 @@ import {useLocation} from '@docusaurus/router';
 
 const gap = 28;
 
-export default function CardLayers({children, title, onLayerChange}) {
+export default function ContentPages({children, title}) {
   const viewport = useRef(null);
   const flow = useRef(null);
   const {hash, key: locationKey} = useLocation();
@@ -70,15 +70,6 @@ export default function CardLayers({children, title, onLayerChange}) {
     setLayer(Math.max(0, Math.min(layout.labels.length - 1, Math.floor((offset + 1) / stride))));
   }, [hash, locationKey, layout.width, layout.height, layout.labels.length, stride]);
 
-  useEffect(() => {
-    let anchor;
-    try { anchor = decodeURIComponent(hash.slice(1)); } catch { anchor = ''; }
-    const heading = layout.headings.find(item => item.layer === layer && item.id === anchor) ||
-      layout.headings.find(item => item.layer === layer) ||
-      layout.headings.filter(item => item.layer < layer).at(-1);
-    onLayerChange?.(heading?.id || null);
-  }, [layer, layout.headings, hash, onLayerChange]);
-
   const revealFocus = event => {
     const origin = flow.current.getBoundingClientRect().left;
     const rects = Array.from(event.target.getClientRects());
@@ -88,22 +79,22 @@ export default function CardLayers({children, title, onLayerChange}) {
   };
   const change = next => setLayer(Math.max(0, Math.min(layout.labels.length - 1, next)));
 
-  return <div className="card-layers" data-layer={layer + 1} data-layer-count={layout.labels.length}>
+  return <div className="card-layers" data-page={layer + 1} data-page-count={layout.labels.length}>
     <div className="layer-window" ref={viewport}>
       <div className="layer-flow" ref={flow} onFocusCapture={revealFocus}
         style={{columnGap: `${gap}px`, transform: `translateX(${-layer * stride}px)`}}>
         {children}
       </div>
     </div>
-    <nav className="layer-controls" aria-label={`${title} layers`}>
-      <button type="button" disabled={layer === 0} onClick={() => change(layer - 1)}>Previous</button>
-      <label className="layer-select"><span className="sr-only">Agent Card layer</span>
+    <nav className="layer-controls" aria-label={`${title} content pages`}>
+      <button type="button" disabled={layer === 0} onClick={() => change(layer - 1)}>Previous page</button>
+      <label className="layer-select"><span className="sr-only">Content page</span>
         <select value={layer} onChange={event => change(Number(event.target.value))}>
           {layout.labels.map((label, index) => <option key={index} value={index}>{index + 1}. {label}</option>)}
         </select>
       </label>
       <span className="layer-position" role="status" aria-live="polite">{layer + 1} / {layout.labels.length}</span>
-      <button type="button" disabled={layer === layout.labels.length - 1} onClick={() => change(layer + 1)}>Next</button>
+      <button type="button" disabled={layer === layout.labels.length - 1} onClick={() => change(layer + 1)}>Next page</button>
     </nav>
   </div>;
 }

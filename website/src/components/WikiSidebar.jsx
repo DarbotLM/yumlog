@@ -60,7 +60,7 @@ export default function WikiSidebar({assets, sections, currentId, activeHeading,
     currentId,
     cards: expanded.includes(id) ? expanded.filter(card => card !== id) : [...expanded, id],
   });
-  const href = (id, anchor) => `${root}${id}/${anchor ? `#${encodeURIComponent(anchor)}` : ''}`;
+  const href = (id, target = 'title') => `${root}${id}/${target}/`;
 
   return <aside ref={aside} className="wiki-dock" aria-label="Studio wiki sections" data-open={open}
     onKeyDown={event => {
@@ -94,7 +94,8 @@ export default function WikiSidebar({assets, sections, currentId, activeHeading,
         {assets.map(asset => <div className="wiki-tree-card" key={asset.id}>
           <div className="wiki-tree-row" data-card={asset.id}>
             <a className="wiki-card-link" href={href(asset.id)} onClick={event => follow(event, asset.id)}
-              aria-current={currentId === asset.id ? 'page' : undefined}>
+              data-current={currentId === asset.id}
+              aria-current={currentId === asset.id && activeHeading === 'title' ? 'page' : undefined}>
               <Glyph name={asset.glyph}/><span>{asset.title}</span>
             </a>
             <button className="wiki-tree-toggle" type="button" aria-expanded={expanded.includes(asset.id)}
@@ -108,7 +109,7 @@ export default function WikiSidebar({assets, sections, currentId, activeHeading,
           <ul className="wiki-subsections" id={`wiki-sections-${asset.id}`} hidden={!expanded.includes(asset.id)}>
             {sections[asset.id].map(item => <li key={item.id}>
               <a href={href(asset.id, item.id)} onClick={event => follow(event, asset.id, item.id)}
-                aria-current={currentId === asset.id && activeHeading === item.id ? 'location' : undefined}>
+                aria-current={currentId === asset.id && activeHeading === item.id ? 'page' : undefined}>
                 {item.value}
               </a>
             </li>)}
@@ -119,8 +120,9 @@ export default function WikiSidebar({assets, sections, currentId, activeHeading,
         <Link to={`${docBase}SDK-FRAMEWORK/`}>SDK &amp; framework</Link>
         <Link to={`${docBase}AGENT-PLUGIN/`}>Agent Plugin &amp; MCP</Link>
         <Link to={`${docBase}NATIVE-CLI/`}>Native CLI reference</Link>
+        <a href={`${root.replace(/wiki\/$/, '')}cards/index.json`}>Agent card catalog</a>
       </div>
-      <a className="install-studio" href={href('settings')} onClick={event => follow(event, 'settings')}>Install Yumlog {release.version}</a>
+      <a className="install-studio" href={href('settings', 'instructions')} onClick={event => follow(event, 'settings', 'instructions')}>Install Yumlog {release.version}</a>
     </div>
   </aside>;
 }

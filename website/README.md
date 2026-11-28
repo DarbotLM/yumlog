@@ -1,9 +1,9 @@
 # Studio wiki
 
 The Docusaurus website publishes to `https://darbotlm.github.io/yumlog/`.
-The product homepage and eleven `/wiki/<section>/` routes reuse the Studio
-section descriptors in the root `_config.yml`. Each `content/*.mdx` article
-has its own rendered HTML, title and canonical URL. The top navigation keeps
+The product homepage and 66 `/wiki/<section>/<layer>/` routes reuse the Studio
+section descriptors in the root `_config.yml` and source `content/*.mdx`
+articles. Each card has its own rendered HTML, title and canonical URL. The top navigation keeps
 Website and Wiki deck separate, with full-text search immediately after
 Website and a shared Agent Card Size control on wiki pages.
 Root `docs/` files remain developer guides, including redirects from their
@@ -55,11 +55,13 @@ The uploaded artifact is **only** `website/build`;
 release packages, local media, models and native build outputs are excluded.
 The checkout step does not download Git LFS payloads.
 
-Selecting a dock or bottom tab opens `/wiki/<id>/`. The optional `face`
-query selects Tool view or Paperboy details. `/wiki/`, the former section-query
-URLs at both root and `/wiki/`, and legacy section hashes redirect to the
-canonical section URL. Bare root visits open the product website. The other
-faces are documentation overviews, not live application controls. The website
+Selecting a section opens its Title card. Its six authored layers are Title,
+Overview, Instructions, Format and Outputs, Agents and Tools, SDK and Examples.
+Front shows human-readable content. Back offers Adaptive Card 1.5, AgentCard,
+History and Framework tabs; `?side=back&tab=agentcard` can link directly to one.
+`/wiki/`, the former section-query URLs, `/wiki/<section>/`, old heading
+anchors and `?face=paperboy` remain supported as redirects. Bare root visits
+open the product website. These cards are documentation, not running agents. The website
 does not contact desktop services, capture media or invoke tools.
 
 Search loads the generated `search-index.json` from this site only when
@@ -70,22 +72,39 @@ to Wide; an explicit selection persists only in the current browser session
 and does not change native Studio settings. Wide mode uses half the normal
 top spacing above the card at each breakpoint.
 
-Wiki cards fit the available viewport. Their content flows into measured
-Agent Card layers, navigated with Previous, Next, or the layer selector.
-Text, lists, tables and code continue across layers rather than being
-truncated; original links and code-copy controls remain live. Resizing or
-changing Agent Card Size recalculates the layers. Heading links and keyboard
-focus reveal their corresponding layer. Printing includes the complete text.
+Wiki cards fit the available viewport. Long front or back content flows into
+measured content pages inside its authored layer. The Agent Card layer selector
+always has exactly six entries; Previous page / Next page never create new
+semantic layers. Text, lists, tables and code are not truncated. Resizing or
+changing Agent Card Size recalculates only the content pages. Heading links and
+keyboard focus reveal their corresponding page. Printing includes the current face's full content.
 Short or narrow viewports replace the full section dock with compact section
 and developer-guide selectors. Product pages and standalone developer guides
 retain their normal document layout.
 
-The selected card automatically expands its named headings in the wiki
-sidebar. Heading links reveal their containing layer, including the dynamic
-release/install sections. Expand all stays expanded when switching cards;
+The selected section automatically expands its six cards in the wiki
+sidebar. Expand all stays expanded when switching sections;
 Collapse all and individual toggles are also available. Only the sidebar
 scrolls when expanded content exceeds its height. Compact layouts expose the
 same accordion through the Sections button without moving the Agent Card.
+
+## Machine-readable cards
+
+`cards/index.json` lists every layer, its canonical URL, exported JSON URLs
+and SHA-256 digests. Per-layer exports under `cards/<section>/` include the
+complete flipcard envelope, Adaptive Card 1.5 payload, AgentCard 3.1 descriptor,
+source history and framework metadata. Schemas are served under `schemas/`.
+The build validates every envelope and its nested card payloads with AJV;
+unsupported Markdown constructs or unassigned headings fail rather than
+silently dropping content. See `schemas/README.md` for pinned schema provenance.
+
+The existing eleven articles remain the authored source. The card generator
+assigns their named subsections to the fixed semantic layers; release-specific
+installation content comes from the verified release metadata. Source history
+is the latest five documentation/generator commits available in the checkout,
+not a runtime event log. Actions fetches up to 50 commits and explicitly reports
+shallow history. Source hashes, build revision and working-tree status distinguish
+published source from local edits. Download descriptors do not grant tool access.
 
 Product screenshots must be supplied and approved for publication. Do not
 substitute annotated website screenshots or fabricated media for native app
